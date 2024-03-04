@@ -70,7 +70,7 @@ def find_closest_color(pixel):
 def color_distance(color1, color2):
     return sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2))
 
-def process_image(map_image, file_name):
+def process_image(map_image):
     map_image_np = np.array(map_image)
     height, width, _ = map_image_np.shape
     terrain_grid = np.zeros((width, height), dtype=np.uint8)
@@ -147,9 +147,6 @@ def process_image(map_image, file_name):
                             px, py = x + i, y + j
                             if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
                                 terrain_grid_final[px, py] = black_id
-    # Save the terrain_grid
-    file_path = os.path.join("files/terrain_grids", f"{file_name}.txt")
-    np.savetxt(file_path, terrain_grid_final, fmt='%d')
 
     return terrain_grid_final
 
@@ -328,9 +325,6 @@ def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
-        folder_path = "files/terrain_grids"
-        file_name = os.path.splitext(os.path.basename(file_path))[0]  # Remove the file extension
-        terrain_colors = np.array([])
         
         root = tk.Tk()
         app = PointSelectionApp(root, map_image)
@@ -342,15 +336,7 @@ def main():
 
         # Crop the map around the points
         cropped_map_image, adjusted_start_point, adjusted_end_point, crop_offset = crop_map_around_points(map_image, start_point, end_point)
-
-
-        # Process image
-        if os.path.exists(file_name):
-            terrain_colors = np.genfromtxt(os.path.join(folder_path, file_name), delimiter=',')
-
-        else:
-            # Process the map and save the terrain grid
-            terrain_colors = process_image(map_image, file_name)
+        terrain_colors = process_image(map_image)
 
         # Calculate the terrain costs
         terrain_costs = calculate_terrain_costs(terrain_colors)
