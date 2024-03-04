@@ -98,7 +98,7 @@ def process_image(cropped_map_image):
         color_percentages = [count / total_pixels for count in color_counts]
 
         if any(percentage >= threshold for percentage in color_percentages):
-            terrain_grid[x, :] = 2
+            terrain_grid[x, :] = 4
 
    # Step 3: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
