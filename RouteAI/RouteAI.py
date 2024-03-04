@@ -86,8 +86,7 @@ def process_image(cropped_map_image):
     black_id = 5
     olive_id = 6
     blue_id = 7
-    threshold = 0.6
-    columns_to_remove = []
+    threshold = 0.5
 
     colors_to_check = [black_id, olive_id, blue_id]
 
