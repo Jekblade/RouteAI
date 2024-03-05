@@ -49,11 +49,11 @@ color_costs = {
     "black": 0.01,
     "yellow": 0.3,
     "blue": 20,
-    "brown": 40,
-    "dark_brown": 40,
-    "purple": 30,
+    "brown": 100,
+    "dark_brown": 100,
+    "purple": 100,
     "olive": 0,
-    "pink": 30
+    "pink": 100
 }
 
 
@@ -70,8 +70,8 @@ def find_closest_color(pixel):
 def color_distance(color1, color2):
     return sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2))
 
-def process_image(map_image, file_name):
-    map_image_np = np.array(map_image)
+def process_image(cropped_map_image):
+    map_image_np = np.array(cropped_map_image)
     height, width, _ = map_image_np.shape
     terrain_grid = np.zeros((width, height), dtype=np.uint8)
 
@@ -86,8 +86,7 @@ def process_image(map_image, file_name):
     black_id = 5
     olive_id = 6
     blue_id = 7
-    threshold = 0.6
-    columns_to_remove = []
+    threshold = 0.8
 
     colors_to_check = [black_id, olive_id, blue_id]
 
@@ -98,7 +97,7 @@ def process_image(map_image, file_name):
         color_percentages = [count / total_pixels for count in color_counts]
 
         if any(percentage >= threshold for percentage in color_percentages):
-            terrain_grid = np.delete(terrain_grid, columns_to_remove, axis=0)
+            terrain_grid[x, :] = 4
 
    # Step 3: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
@@ -134,6 +133,7 @@ def process_image(map_image, file_name):
                             px, py = x + i * best_direction[0], y + j * best_direction[1]
                             if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
                                 terrain_grid_final[px, py] = black_id
+
                 else:  # Diagonal direction
                     for i in range(-1, 2):
                         for j in range(-1, 2):
@@ -147,9 +147,6 @@ def process_image(map_image, file_name):
                             px, py = x + i, y + j
                             if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
                                 terrain_grid_final[px, py] = black_id
-    # Save the terrain_grid
-    file_path = os.path.join("files/terrain_grids", f"{file_name}.txt")
-    np.savetxt(file_path, terrain_grid_final, fmt='%d')
 
     return terrain_grid_final
 
@@ -212,10 +209,10 @@ class PointSelectionApp:
             self.master.quit()
 
 
-def crop_map_around_points(map_image, start_point, end_point, buffer_size=100):
+def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=120):
     # Extract coordinates
-    start_x, start_y = start_point
-    end_x, end_y = end_point
+    start_x, start_y = raw_start_point
+    end_x, end_y = raw_end_point
 
     # Get the size of the map image
     map_width, map_height = map_image.size
@@ -231,13 +228,13 @@ def crop_map_around_points(map_image, start_point, end_point, buffer_size=100):
 
 
     # Update the adjusted start and end points
-    adjusted_start_point = (start_x - min_x, start_y - min_y)
-    adjusted_end_point = (end_x - min_x, end_y - min_y)
+    start_point = (start_x - min_x, start_y - min_y)
+    end_point = (end_x - min_x, end_y - min_y)
 
     # Calculate crop offset
     crop_offset = (min_x, min_y)
 
-    return cropped_image, adjusted_start_point, adjusted_end_point, crop_offset
+    return cropped_image, start_point, end_point, crop_offset
 
 
 # Calculating the terrain costs
@@ -252,18 +249,7 @@ def calculate_terrain_costs(terrain_colors):
 
     return terrain_costs
 
-def calculate_lowest_cost_path(terrain_costs, start_point, end_point):
-    # Calculate the lowest cost path
-    start_to_end_path, start_to_end_cost = _calculate_single_path(terrain_costs, start_point, end_point)
-    end_to_start_path, end_to_start_cost = _calculate_single_path(terrain_costs, end_point, start_point)
-
-    # Determine which path has the lowest cost
-    if start_to_end_cost < end_to_start_cost:
-        return start_to_end_path, start_to_end_cost
-    else:
-        return end_to_start_path, end_to_start_cost
-
-def _calculate_single_path(terrain_costs, start_point, end_point):
+def calculate_path(terrain_costs, start_point, end_point):
     width, height = terrain_costs.shape[0], terrain_costs.shape[1]
     dp = np.full((width, height), np.inf)
     dp[start_point] = terrain_costs[start_point]
@@ -281,8 +267,11 @@ def _calculate_single_path(terrain_costs, start_point, end_point):
     for i in range(start_point[0] + dx, end_point[0] + dx, dx):
         for j in range(start_point[1] + dy, end_point[1] + dy, dy):
             # Avoid olive green areas by setting their cost to infinity
-            if terrain_costs[i, j] == color_costs["olive"]:
-                dp[i, j] = np.inf
+            avoid = ["olive","pink","purple"]
+            for color in avoid:
+                if terrain_costs[i, j] == color_costs[color]:
+                    dp[i, j] = np.inf
+
             else:
                 # Consider all directions except going backward
                 candidates = [dp[i - dx, j], dp[i, j - dy], dp[i - dx, j - dy]]
@@ -309,16 +298,19 @@ def _calculate_single_path(terrain_costs, start_point, end_point):
             i, j = min_neighbor[1:]
             path.append((i, j))
         else:
-            # If no valid candidates are found, break out of the loop and search around the olive green area
-            olive_green_indices = np.where(terrain_costs == color_costs["olive"])
-            olive_green_points = list(zip(olive_green_indices[0], olive_green_indices[1]))
-            for olive_i, olive_j in olive_green_points:
-                path.append((olive_i, olive_j))
+            # If no valid candidates are found, break out of the loop and search around the forbidden area
+            forbidden_colors = ["olive"]
+            for color in forbidden_colors:
+                indices = np.where(terrain_costs == color_costs[color])
+                forbidden_points.extend(list(zip(indices[0], indices[1])))
+
+            for forbidden_i, forbidden_j in forbidden_points:
+                path.append((forbidden_i, forbidden_j))
             break
 
     # Add the starting point, remove first and last 10
     path.append(start_point)
-    path = path[10:-10]
+    path = path[6:-6:10]
 
     return path[::-1], dp[end_point]
 
@@ -328,43 +320,32 @@ def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
-        folder_path = "files/terrain_grids"
-        file_name = os.path.splitext(os.path.basename(file_path))[0]  # Remove the file extension
-        terrain_colors = np.array([])
         
         root = tk.Tk()
         app = PointSelectionApp(root, map_image)
         root.mainloop()
 
         # Get the selected points
-        start_point = (int(app.points[0][0]), int(app.points[0][1]))
-        end_point = (int(app.points[1][0]), int(app.points[1][1]))
+        raw_start_point = (int(app.points[0][0]), int(app.points[0][1]))
+        raw_end_point = (int(app.points[1][0]), int(app.points[1][1]))
 
         # Crop the map around the points
-        cropped_map_image, adjusted_start_point, adjusted_end_point, crop_offset = crop_map_around_points(map_image, start_point, end_point)
-
-
-        # Process image
-        if os.path.exists(file_name):
-            terrain_colors = np.genfromtxt(os.path.join(folder_path, file_name), delimiter=',')
-
-        else:
-            # Process the map and save the terrain grid
-            terrain_colors = process_image(map_image, file_name)
+        cropped_map_image, start_point, end_point, crop_offset = crop_map_around_points(map_image, raw_start_point, raw_end_point)
+        terrain_colors = process_image(cropped_map_image)
 
         # Calculate the terrain costs
         terrain_costs = calculate_terrain_costs(terrain_colors)
 
         # Calculate the lowest cost path
-        path, cost = calculate_lowest_cost_path(terrain_costs, adjusted_start_point, adjusted_end_point)
+        path, cost = calculate_path(terrain_costs, start_point, end_point)
 
         # Plot the cropped map with the lowest cost path
         plt.figure()
         plt.imshow(cropped_map_image)
         plt.plot(*zip(*path), color='red', linewidth=2)  # Plot the path
-        plt.scatter(adjusted_start_point[0], adjusted_start_point[1], edgecolors='red', linewidths=2, s=100, marker='o') 
-        plt.scatter(adjusted_end_point[0], adjusted_end_point[1], edgecolors='blue', linewidths=2, s=100, marker='o')  
-        plt.plot([adjusted_start_point[0], adjusted_end_point[0]], [adjusted_start_point[1], adjusted_end_point[1]], color = "magenta", linewidth=1)  # Plot the connection
+        plt.scatter(start_point[0], start_point[1], edgecolors='red', linewidths=2, s=100, marker='o') 
+        plt.scatter(end_point[0], end_point[1], edgecolors='blue', linewidths=2, s=100, marker='o')  
+        plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color = "magenta", linewidth=1)  # Plot the connection
         plt.title('Optimal Route choice')
         plt.show()
 

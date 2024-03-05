@@ -70,7 +70,6 @@ class PointSelectionApp:
         # Close the window
         self.master.destroy()
 
-
 def draw_shortest_path(points, map_image):
     k = len(points) - 2
     red_point = np.array([points[0]])
