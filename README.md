@@ -52,4 +52,3 @@ Contributions to the Orienteering Application are welcome. Please refer to the C
 # License
 
 The Orienteering Application is released under the MIT License. See the LICENSE file for more details.
-
