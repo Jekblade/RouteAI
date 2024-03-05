@@ -1,8 +1,8 @@
 # Orienteering
 
-Welcome to the Orienteering project, a comprehensive toolkit designed to enhance the experience of orienteering athletes, course planners, event organizers, and participants. This versatile application brings together several key functionalities, including route planning, map conversion, and rogaining management, all within a user-friendly interface.
+Welcome to the Orienteering project, a comprehensive tool designed to enhance the experience of orienteering athletes, course planners and event organizers. This versatile application brings together several key functionalities, including optimal route-choice testing, map conversion, and rogaining routes, all within a user-friendly interface.
 
-That's the fancy way of saying it. But in reality, this project was done to learn about path-finding algorithms from Graph Theory. There are soo many improvements that could be made. In the longterm there could be a use for for this for event organizers to plan courses and predict finish times.
+This project was done to learn about path-finding algorithms from Graph Theory. There are soo many improvements that could be made. In the longterm this app could be used by course setters to plan appropriately-long courses and predict finish times. For example, 30-35mins in WRE middle events.
 
 
 # Features
@@ -10,11 +10,11 @@ That's the fancy way of saying it. But in reality, this project was done to lear
 The Orienteering Application offers three main features:
 
 1. RouteAI
-Description: Utilize advanced Image Processing algorithms and path-finding principles to see the optimal routes for orienteering controls. This feature assists in creating challenging yet navigable routes for competitions or training.
-Usage: Ideal for event organizers and athletes to design courses or analyse some route-choices.
+Description: Utilize advanced Image Processing algorithms and path-finding principles to see the optimal routes for orienteering controls. This feature enables athletes theoretically calculate the best route-choice for difficult controls.
+Usage: Ideal for event organizers and athletes to design courses or perform route-choice analysis.
 
 2. MapConvert
-Description: A tool for converting PNG orienteering map into a scattered grid of generalized pixels. This is used to see how the computer processes the image into a pixel array that it understands. Use for tweaking the image processing part of the code.
+Description: A tool for converting PNG orienteering map into a scattered grid of generalized pixels. This is used to see how the computer processes the image into a pixel array that it understands. Used for tweaking the image processing part of the RouteAI code.
 
 3. Rogaining
 Description: Plan your rogaining routes with ease. This app asks for the user input of all the controls, then using various path-finding algorithms to connect all the controls in a line.
@@ -27,8 +27,8 @@ To install the Orienteering Application, follow these steps:
 
 1. Clone the repository or download the source code to your local machine.
 2. Ensure that Python (version 3.6 or later) is installed on your system.
-3. Install required dependencies by running pip install -r requirements.txt in the terminal within the project directory.
-4. Execute the main script to launch the application: python main.py.
+3. Install required dependencies by running "pip3 install -r requirements.txt" in the terminal within the project directory.
+4. Execute the main script to launch the application: "python main.py" OR launch it with Python Launcher.
 
 
 # Usage

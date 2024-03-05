@@ -49,11 +49,11 @@ color_costs = {
     "black": 0.01,
     "yellow": 0.3,
     "blue": 20,
-    "brown": 40,
-    "dark_brown": 40,
-    "purple": 30,
+    "brown": 100,
+    "dark_brown": 100,
+    "purple": 100,
     "olive": 0,
-    "pink": 30
+    "pink": 100
 }
 
 
@@ -86,7 +86,7 @@ def process_image(cropped_map_image):
     black_id = 5
     olive_id = 6
     blue_id = 7
-    threshold = 0.5
+    threshold = 0.8
 
     colors_to_check = [black_id, olive_id, blue_id]
 
@@ -209,7 +209,7 @@ class PointSelectionApp:
             self.master.quit()
 
 
-def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=100):
+def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=120):
     # Extract coordinates
     start_x, start_y = raw_start_point
     end_x, end_y = raw_end_point
@@ -267,8 +267,11 @@ def calculate_path(terrain_costs, start_point, end_point):
     for i in range(start_point[0] + dx, end_point[0] + dx, dx):
         for j in range(start_point[1] + dy, end_point[1] + dy, dy):
             # Avoid olive green areas by setting their cost to infinity
-            if terrain_costs[i, j] == color_costs["olive"]:
-                dp[i, j] = np.inf
+            avoid = ["olive","pink","purple"]
+            for color in avoid:
+                if terrain_costs[i, j] == color_costs[color]:
+                    dp[i, j] = np.inf
+
             else:
                 # Consider all directions except going backward
                 candidates = [dp[i - dx, j], dp[i, j - dy], dp[i - dx, j - dy]]
@@ -295,16 +298,19 @@ def calculate_path(terrain_costs, start_point, end_point):
             i, j = min_neighbor[1:]
             path.append((i, j))
         else:
-            # If no valid candidates are found, break out of the loop and search around the olive green area
-            olive_green_indices = np.where(terrain_costs == color_costs["olive"])
-            olive_green_points = list(zip(olive_green_indices[0], olive_green_indices[1]))
-            for olive_i, olive_j in olive_green_points:
-                path.append((olive_i, olive_j))
+            # If no valid candidates are found, break out of the loop and search around the forbidden area
+            forbidden_colors = ["olive"]
+            for color in forbidden_colors:
+                indices = np.where(terrain_costs == color_costs[color])
+                forbidden_points.extend(list(zip(indices[0], indices[1])))
+
+            for forbidden_i, forbidden_j in forbidden_points:
+                path.append((forbidden_i, forbidden_j))
             break
 
     # Add the starting point, remove first and last 10
     path.append(start_point)
-    path = path[6:-6]
+    path = path[6:-6:10]
 
     return path[::-1], dp[end_point]
 
