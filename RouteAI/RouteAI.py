@@ -5,6 +5,7 @@ from tkinter import filedialog
 import matplotlib.pyplot as plt
 import os
 
+
 # Define main colors for categories
 main_colors = {
     0: "white",
@@ -49,11 +50,11 @@ color_costs = {
     "black": 0.01,
     "yellow": 0.3,
     "blue": 20,
-    "brown": 100,
-    "dark_brown": 100,
-    "purple": 100,
-    "olive": 0,
-    "pink": 100
+    "brown": 40,
+    "dark_brown": 40,
+    "purple": 50,
+    "olive": 1000,
+    "pink": 50
 }
 
 
@@ -83,21 +84,20 @@ def process_image(cropped_map_image):
             terrain_grid[x, y] = list(main_colors.keys())[list(main_colors.values()).index(closest_color)]
     
     # Step 2: Check for vertical lines and remove them (magnetic horizon lines)
-    black_id = 5
-    olive_id = 6
     blue_id = 7
-    threshold = 0.8
+    black_id = 5
+    threshold = 0.4
 
-    colors_to_check = [black_id, olive_id, blue_id]
+    colors_to_check = [blue_id, black_id]
 
     for x in range(width):
-        color_counts = [np.count_nonzero(terrain_grid[x, :] == color_id) for color_id in colors_to_check]
+        color_counts = [np.count_nonzero(terrain_grid[x, :] == blue_id) for color_id in colors_to_check]
         total_pixels = height
 
         color_percentages = [count / total_pixels for count in color_counts]
 
         if any(percentage >= threshold for percentage in color_percentages):
-            terrain_grid[x, :] = 4
+            terrain_grid[x, :] = 9
 
    # Step 3: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
@@ -266,40 +266,37 @@ def calculate_path(terrain_costs, start_point, end_point):
 
     for i in range(start_point[0] + dx, end_point[0] + dx, dx):
         for j in range(start_point[1] + dy, end_point[1] + dy, dy):
-            # Avoid olive green areas by setting their cost to infinity
-            avoid = ["olive","pink","purple"]
-            for color in avoid:
-                if terrain_costs[i, j] == color_costs[color]:
-                    dp[i, j] = np.inf
-
-            else:
-                # Consider all directions except going backward
-                candidates = [dp[i - dx, j], dp[i, j - dy], dp[i - dx, j - dy]]
-                if dx == 1:
-                    candidates.append(dp[i - dx, j - dy])
-                elif dx == -1:
-                    candidates.append(dp[i, j - dy])
-                dp[i, j] = min(candidates) + terrain_costs[i, j]
+        
+            # Consider all directions except going backward
+            candidates = [dp[i - dx, j], dp[i, j - dy], dp[i - dx, j - dy]]
+            if dx == 1:
+                candidates.append(dp[i - dx, j - dy])
+            elif dx == -1:
+                candidates.append(dp[i, j - dy])
+            dp[i, j] = min(candidates) + terrain_costs[i, j]
 
     # Backtrack to find the lowest cost path
     path = [(end_point[0], end_point[1])]  # Start from the end point
     i, j = end_point[0], end_point[1]
+    forbidden_points = []
     while i != start_point[0] or j != start_point[1]:
         candidates = [(i - dx, j), (i, j - dy), (i - dx, j - dy)]
         if dx == 1:
             candidates.append((i - dx, j - dy))
         elif dx == -1:
             candidates.append((i, j - dy))
+
         # Filter out candidates that are out of bounds or have infinite cost
-        valid_candidates = [(x, y) for x, y in candidates if 0 <= x < width and 0 <= y < height and dp[x, y] != np.inf]
+        valid_candidates = [(x, y) for x, y in candidates if 0 <= x < width and 0 <= y < height]
+        
         # Find the minimum neighbor among the valid candidates
         if valid_candidates:
             min_neighbor = min((dp[x, y], x, y) for x, y in valid_candidates)
             i, j = min_neighbor[1:]
             path.append((i, j))
         else:
-            # If no valid candidates are found, break out of the loop and search around the forbidden area
-            forbidden_colors = ["olive"]
+            # If no valid candidates are found, search around the forbidden area
+            forbidden_colors = ["olive", "brown", "dark_brown"]
             for color in forbidden_colors:
                 indices = np.where(terrain_costs == color_costs[color])
                 forbidden_points.extend(list(zip(indices[0], indices[1])))
@@ -310,9 +307,10 @@ def calculate_path(terrain_costs, start_point, end_point):
 
     # Add the starting point, remove first and last 10
     path.append(start_point)
-    path = path[6:-6:10]
+    path = path[10:-10]
 
     return path[::-1], dp[end_point]
+
 
 
 def main():
