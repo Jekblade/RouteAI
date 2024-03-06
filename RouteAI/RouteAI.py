@@ -38,7 +38,7 @@ main_color_values = {
     "brown": (210, 175, 150),
     "dark_brown": (170, 80, 30),
     "purple": (130, 20, 115),
-    "pink": (225, 125, 172)
+    "pink": (225, 125, 172),
 }
 
 # Costs associated with terrain runnability
@@ -51,8 +51,8 @@ color_costs = {
     "black": 2,
     "yellow": 2,
     "blue": 5,
-    "brown": 6,
-    "dark_brown": 7,
+    "brown": 10,
+    "dark_brown": 11,
     "purple": 7,
     "olive": 100,
     "pink": 7
@@ -210,7 +210,7 @@ class PointSelectionApp:
             self.master.quit()
 
 
-def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=110):
+def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=120):
     # Extract coordinates
     start_x, start_y = raw_start_point
     end_x, end_y = raw_end_point
@@ -314,7 +314,7 @@ def main():
         # Plot the cropped map with the lowest cost path
         plt.figure()
         plt.imshow(cropped_map_image)
-        plt.plot(*zip(*path), color='red', linewidth=2)  # Plot the path
+        plt.plot(*zip(*path), color='red', linewidth=2, linestyle='dotted', dash_capstyle='round', dashes=(2,))  # Plot the path
         plt.scatter(start_point[0], start_point[1], edgecolors='red', linewidths=2, s=100, marker='o') 
         plt.scatter(end_point[0], end_point[1], edgecolors='blue', linewidths=2, s=100, marker='o')  
         plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color = "magenta", linewidth=1)  # Plot the connection
