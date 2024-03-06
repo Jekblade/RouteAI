@@ -42,16 +42,16 @@ main_color_values = {
 
 # Costs associated with terrain runnability
 color_costs = {
-    "white": 1,
-    "light_green": 2,
-    "green": 4,
-    "dark_green": 8,
-    "orange": 0.5,
-    "black": 0.01,
-    "yellow": 0.2,
-    "blue": 8,
-    "brown": 40,
-    "dark_brown": 40,
+    "white": 5,
+    "light_green": 8,
+    "green": 12,
+    "dark_green": 16,
+    "orange": 3,
+    "black": 1,
+    "yellow": 2,
+    "blue": 14,
+    "brown": 25,
+    "dark_brown": 25,
     "purple": 50,
     "olive": 1000,
     "pink": 50
