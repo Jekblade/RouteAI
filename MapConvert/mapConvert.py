@@ -54,7 +54,7 @@ def find_closest_color(pixel):
 def color_distance(color1, color2):
     return sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2))
 
-def process_image(map_image, file_name):
+def process_image(map_image):
     map_image_np = np.array(map_image)
     height, width, _ = map_image_np.shape
     terrain_grid = np.zeros((width, height), dtype=np.uint8)
@@ -68,12 +68,11 @@ def process_image(map_image, file_name):
     
     # Step 2: Check for vertical lines and remove them (magnetic horizon lines)
     black_id = 5
-    olive_id = 6
     blue_id = 7
-    threshold = 0.6
+    threshold = 0.4
     columns_to_remove = []
 
-    colors_to_check = [black_id, olive_id, blue_id]
+    colors_to_check = [black_id, blue_id]
 
     for x in range(width):
         color_counts = [np.count_nonzero(terrain_grid[x, :] == color_id) for color_id in colors_to_check]
@@ -82,7 +81,7 @@ def process_image(map_image, file_name):
         color_percentages = [count / total_pixels for count in color_counts]
 
         if any(percentage >= threshold for percentage in color_percentages):
-            terrain_grid = np.delete(terrain_grid, columns_to_remove, axis=0)
+            terrain_grid[x, :] = 10
 
    # Step 3: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
@@ -131,10 +130,6 @@ def process_image(map_image, file_name):
                             px, py = x + i, y + j
                             if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
                                 terrain_grid_final[px, py] = black_id
-    
-    # Save the terrain_grid
-    file_path = os.path.join("files/terrain_grids", f"{file_name}.txt")
-    np.savetxt(file_path, terrain_grid_final, fmt='%d')
 
     return terrain_grid_final
 
@@ -145,19 +140,9 @@ def main():
     
     if file_path:
         map_image = Image.open(file_path)
-        folder_path = "files/terrain_grids"
 
-        # Extract the file name from the file path
-        file_name = os.path.splitext(os.path.basename(file_path))[0]  # Remove the file extension
-
-        terrain_colors = np.array([])
-
-        if os.path.exists(file_name):
-            terrain_colors = np.genfromtxt(os.path.join(folder_path, file_name), delimiter=',')
-
-        else:
-            # Process the map and save the terrain grid
-            terrain_colors = process_image(map_image, file_name)
+        # Process the map and save the terrain grid
+        terrain_colors = process_image(map_image)
 
         width, height = np.shape(terrain_colors)
         x_coords, y_coords = np.meshgrid(np.arange(height), np.arange(width)) 
@@ -169,7 +154,7 @@ def main():
 
         # Create a scatter plot of the pixels with their respective main color values
         plt.figure(figsize=(width / 100, height / 100)) 
-        plt.scatter(x_flat, y_flat, c=color_rgb_flat / 255.0, marker='s')
+        plt.scatter(x_coords, y_coords, c=color_rgb_flat / 255.0, marker='s')
         plt.title('Map interpretation with Adjusted Color Categories')
 
         plt.gca().set_aspect('equal', adjustable='box')  # Set equal aspect ratio

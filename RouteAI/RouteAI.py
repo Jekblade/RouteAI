@@ -3,6 +3,7 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
+import networkx as nx
 import os
 
 
@@ -42,19 +43,19 @@ main_color_values = {
 
 # Costs associated with terrain runnability
 color_costs = {
-    "white": 5,
-    "light_green": 8,
-    "green": 12,
-    "dark_green": 16,
-    "orange": 3,
-    "black": 1,
+    "white": 3,
+    "light_green": 4,
+    "green": 5,
+    "dark_green": 6,
+    "orange": 2,
+    "black": 2,
     "yellow": 2,
-    "blue": 14,
-    "brown": 25,
-    "dark_brown": 25,
-    "purple": 50,
-    "olive": 1000,
-    "pink": 50
+    "blue": 5,
+    "brown": 6,
+    "dark_brown": 7,
+    "purple": 7,
+    "olive": 100,
+    "pink": 7
 }
 
 
@@ -97,7 +98,7 @@ def process_image(cropped_map_image):
         color_percentages = [count / total_pixels for count in color_counts]
 
         if any(percentage >= threshold for percentage in color_percentages):
-            terrain_grid[x, :] = 9
+            terrain_grid[x, :] = 10
 
    # Step 3: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
@@ -209,7 +210,7 @@ class PointSelectionApp:
             self.master.quit()
 
 
-def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=120):
+def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=110):
     # Extract coordinates
     start_x, start_y = raw_start_point
     end_x, end_y = raw_end_point
@@ -249,68 +250,41 @@ def calculate_terrain_costs(terrain_colors):
 
     return terrain_costs
 
+
+def create_graph_from_terrain(terrain_costs):
+    rows, cols = terrain_costs.shape
+    G = nx.DiGraph()
+    
+    # Define the cost of moving diagonally
+    diagonal_cost_multiplier = np.sqrt(2)
+
+    for row in range(rows):
+        for col in range(cols):
+            node = (row, col)
+            # Define neighbors: up, down, left, right, and diagonals
+            neighbors = [
+                (row + 1, col), (row - 1, col), 
+                (row, col + 1), (row, col - 1),
+                (row + 1, col + 1), (row - 1, col - 1),
+                (row + 1, col - 1), (row - 1, col + 1)
+            ]
+            for nr, nc in neighbors:
+                if 0 <= nr < rows and 0 <= nc < cols:  # Check bounds
+                    weight = terrain_costs[nr, nc]
+                    if (nr != row and nc != col):  # Diagonal move
+                        weight *= diagonal_cost_multiplier
+                    G.add_edge(node, (nr, nc), weight=weight)
+    return G
+
+def find_path(terrain_costs, start_point, end_point):
+    G = create_graph_from_terrain(terrain_costs)
+    path = nx.dijkstra_path(G, start_point, end_point, weight='weight')
+    cost = nx.dijkstra_path_length(G, start_point, end_point, weight='weight')
+    return path, cost
+
 def calculate_path(terrain_costs, start_point, end_point):
-    width, height = terrain_costs.shape[0], terrain_costs.shape[1]
-    dp = np.full((width, height), np.inf)
-    dp[start_point] = terrain_costs[start_point]
-
-    # Determine the direction of the end point relative to the start point
-    dx = 1 if end_point[0] > start_point[0] else -1
-    dy = 1 if end_point[1] > start_point[1] else -1
-
-    # Fill the dynamic programming array based on the direction of the end point
-    for i in range(start_point[0] + dx, end_point[0] + dx, dx):
-        dp[i, start_point[1]] = dp[i - dx, start_point[1]] + terrain_costs[i, start_point[1]]
-    for j in range(start_point[1] + dy, end_point[1] + dy, dy):
-        dp[start_point[0], j] = dp[start_point[0], j - dy] + terrain_costs[start_point[0], j]
-
-    for i in range(start_point[0] + dx, end_point[0] + dx, dx):
-        for j in range(start_point[1] + dy, end_point[1] + dy, dy):
-        
-            # Consider all directions except going backward
-            candidates = [dp[i - dx, j], dp[i, j - dy], dp[i - dx, j - dy]]
-            if dx == 1:
-                candidates.append(dp[i - dx, j - dy])
-            elif dx == -1:
-                candidates.append(dp[i, j - dy])
-            dp[i, j] = min(candidates) + terrain_costs[i, j]
-
-    # Backtrack to find the lowest cost path
-    path = [(end_point[0], end_point[1])]  # Start from the end point
-    i, j = end_point[0], end_point[1]
-    forbidden_points = []
-    while i != start_point[0] or j != start_point[1]:
-        candidates = [(i - dx, j), (i, j - dy), (i - dx, j - dy)]
-        if dx == 1:
-            candidates.append((i - dx, j - dy))
-        elif dx == -1:
-            candidates.append((i, j - dy))
-
-        # Filter out candidates that are out of bounds or have infinite cost
-        valid_candidates = [(x, y) for x, y in candidates if 0 <= x < width and 0 <= y < height]
-        
-        # Find the minimum neighbor among the valid candidates
-        if valid_candidates:
-            min_neighbor = min((dp[x, y], x, y) for x, y in valid_candidates)
-            i, j = min_neighbor[1:]
-            path.append((i, j))
-        else:
-            # If no valid candidates are found, search around the forbidden area
-            forbidden_colors = ["olive", "brown", "dark_brown"]
-            for color in forbidden_colors:
-                indices = np.where(terrain_costs == color_costs[color])
-                forbidden_points.extend(list(zip(indices[0], indices[1])))
-
-            for forbidden_i, forbidden_j in forbidden_points:
-                path.append((forbidden_i, forbidden_j))
-            break
-
-    # Add the starting point, remove first and last 10
-    path.append(start_point)
-    path = path[10:-10]
-
-    return path[::-1], dp[end_point]
-
+    path, cost = find_path(terrain_costs, start_point, end_point)
+    return path[::-1], cost
 
 
 def main():
