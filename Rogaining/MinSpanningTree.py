@@ -1,58 +1,80 @@
 import tkinter as tk
 from PIL import Image, ImageTk
+from tkinter import filedialog
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
-from scipy.optimize import linear_sum_assignment
 
 class PointSelectionApp:
-    def __init__(self, master, map_image_path):
+    def __init__(self, master, map_image):
         self.master = master
-        self.master.title("Rogaining course planning with Minimum Spanning Tree")
+        self.master.title("Rogaining course planning with kNearestNeighbour")
 
         self.points = []
-        self.red_point = None
         self.red_point_selected = False
+        self.red_point = None
 
         self.canvas = tk.Canvas(master)
         self.canvas.pack(side="left", fill="y")
 
+        # Scrollbars
         self.v_scrollbar = tk.Scrollbar(master, orient="vertical", command=self.canvas.yview)
         self.v_scrollbar.pack(side="right", fill="y")
         self.canvas.configure(yscrollcommand=self.v_scrollbar.set)
 
-        self.map_photo = ImageTk.PhotoImage(Image.open(map_image_path))
+        self.map_photo = ImageTk.PhotoImage(map_image)
         self.image_item = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.map_photo)
         canvas_width = self.map_photo.width()
-        self.canvas.config(width=canvas_width)
+        canvas_height = self.map_photo.height()
 
+        # Get the screen's height
+        screen_height = master.winfo_screenheight()
+        if canvas_height >= screen_height:
+            canvas_height = master.winfo_screenheight()
+
+        self.canvas.config(width=canvas_width, height=canvas_height)
+
+        # Actions
         self.canvas.bind("<Button-1>", self.add_point)
         self.master.bind("<Return>", self.complete_selection)
 
         self.canvas.update_idletasks()
         self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
 
-        self.map_width = self.map_photo.width()
-        
-        if self.map_height < master.winfo_screenheight():
-            self.map_height = master.winfo_screenheight()
-        else:
-            self.map_height = self.map_photo.height()
+        # Get the map width and height
+        self.map_width = map_image.width
+        self.map_height = map_image.height
+
 
     def add_point(self, event):
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         x += self.canvas.xview()[0]
 
+        # Check if the click is within the bounds of the map canvas
         if 0 <= x <= self.map_width and 0 <= y <= self.map_height:
+             # Always add the point to the canvas
+            color = "red" if not self.red_point_selected else "blue"
+            point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline=color, width=2, fill='')
+            self.points.append((x, y, point_item))  # Add the point to the list
+
+            # If the red point hasn't been selected yet, mark it as red
             if not self.red_point_selected:
                 self.red_point = (x, y)
-            color = "red" if not self.red_point_selected else "blue"
-            self.red_point_selected = True
-            point_item = self.canvas.create_oval(x-6, y-6, x+6, y+6, fill=color, outline=color)
+                self.red_point_selected = True
+            else:
+                color = "blue"
+
+            # Add the point to the canvas
+            point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline=color, width=2, fill='')
+
+            # Store the coordinates of the point along with its canvas item
             self.points.append((x, y, point_item))
 
+            
     def complete_selection(self, event):
+        # Close the window
         self.master.destroy()
+
 
 def minimum_spanning_tree(points, red_point, map_image):
     points_array = np.array([point[:2] for point in points])
@@ -66,21 +88,18 @@ def minimum_spanning_tree(points, red_point, map_image):
             distance = np.linalg.norm(points_array[i] - points_array[j])
             G.add_edge(i, j, weight=distance)
 
+    # Ensure that the graph is connected
+    if not nx.is_connected(G):
+        # If the graph is not connected, get the largest connected component
+        largest_component = max(nx.connected_components(G), key=len)
+        G = G.subgraph(largest_component).copy()
+
     MST = nx.minimum_spanning_tree(G)
+    return MST
 
-    plt.scatter(points_array[:, 0], points_array[:, 1], color='blue')
-    for u, v in MST.edges():
-        x1, y1, _ = points[u]
-        x2, y2, _ = points[v]
-        plt.plot([x1, x2], [y1, y2], color='black')
-
-    plt.scatter(red_point[0], red_point[1], color='red')
-    plt.imshow(map_image)
-    plt.title('Minimum Spanning Tree with Red Point')
-    plt.show()
 
 def find_odd_degree_vertices(G):
-    odd_degree_vertices = [v for v, d in G.degree if d % 2 != 0]
+    odd_degree_vertices = [v for v, d in G.degree() if d % 2 != 0]
     return odd_degree_vertices
 
 def find_min_weight_matching(G, vertices):
@@ -104,21 +123,50 @@ def generate_tsp_tour(eulerian_tour):
     return tsp_tour
 
 def main():
-    map_image_path = "map.jpg"
-    root = tk.Tk()
-    app = PointSelectionApp(root, map_image_path)
-    root.mainloop()
+    file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
+    if file_path:
+        map_image = Image.open(file_path)
+        root = tk.Tk()
+        app = PointSelectionApp(root, map_image)
+        root.mainloop()
 
-    if app.points:
-        G = create_graph(app.points)
-        red_point_index = app.points.index(app.red_point)
-        odd_degree_vertices = find_odd_degree_vertices(G)
-        odd_degree_vertices.remove(red_point_index)  # Remove red point from odd-degree vertices
-        min_weight_matching = find_min_weight_matching(G, odd_degree_vertices)
-        combined_graph = combine_graphs(G, min_weight_matching)
-        eulerian_tour = generate_eulerian_tour(combined_graph)
-        tsp_tour = generate_tsp_tour(eulerian_tour)
-        minimum_spanning_tree(app.points, app.red_point, Image.open(map_image_path))
+        if app.points:
+            if app.red_point in app.points:
+                red_point_index = app.points.index(app.red_point)
+                odd_degree_vertices.remove(red_point_index)
+
+            G = minimum_spanning_tree(app.points, app.red_point, map_image)
+            
+            if not nx.is_connected(G):
+                # Connect disconnected components
+                components = list(nx.connected_components(G))
+                for i in range(len(components) - 1):
+                    # Connect the components by adding an edge between arbitrary vertices
+                    u = list(components[i])[0]
+                    v = list(components[i + 1])[0]
+                    G.add_edge(u, v)
+
+            # Ensure all vertices have even degrees
+            odd_degree_vertices = find_odd_degree_vertices(G)
+            for vertex in odd_degree_vertices:
+                # Find a vertex with odd degree
+                neighbors = list(G.neighbors(vertex))
+                if len(neighbors) % 2 == 0:
+                    # If the number of neighbors is even, add an edge to one of them
+                    target_vertex = neighbors[0]  # Choose one of the neighbors arbitrarily
+                    G.add_edge(vertex, target_vertex)
+                else:
+                    # If the number of neighbors is odd, add a new vertex and connect it to the current vertex
+                    new_vertex = max(G.nodes) + 1  # Generate a new vertex label
+                    G.add_node(new_vertex)
+                    G.add_edge(vertex, new_vertex)
+
+
+            min_weight_matching = find_min_weight_matching(G, odd_degree_vertices)
+            combined_graph = combine_graphs(G, min_weight_matching)
+            eulerian_tour = generate_eulerian_tour(combined_graph)
+            tsp_tour = generate_tsp_tour(eulerian_tour)
+            minimum_spanning_tree(app.points, app.red_point, map_image)
 
 if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
+import networkx as nx
 
 class PointSelectionApp:
     def __init__(self, master, map_image):
@@ -59,7 +60,7 @@ class PointSelectionApp:
                 color = "blue"
 
             # Add the point to the canvas
-            point_item = self.canvas.create_oval(x - 8, y - 8, x + 8, y + 8, color=color, width=2)
+            point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline=color, width=2, fill='')
 
             # Store the coordinates of the point along with its canvas item
             self.points.append((x, y, point_item))
@@ -69,11 +70,11 @@ class PointSelectionApp:
         # Close the window
         self.master.destroy()
 
-
 def draw_shortest_path(points, map_image):
     k = len(points) - 2
     red_point = np.array([points[0]])
 
+    # Get the original points excluding the red point
     original_points = np.array(points[1:])
 
     # Initialize the nearest neighbor algorithm
@@ -105,16 +106,22 @@ def draw_shortest_path(points, map_image):
 
             visited.add(tuple(original_points[nearest_idx]))
 
-    # Connect starting point
-    connections.append((chain[-1], red_point))
 
     # Plot the points and connections
     plt.figure(figsize=(8, 6))
     for connection in connections:
-        plt.plot([connection[0][0], connection[1][0]], [connection[0][1], connection[1][1]], color='green', linewidth=3)
+        plt.plot([connection[0][0], connection[1][0]], [connection[0][1], connection[1][1]], color='purple')
     plt.scatter([point[0] for point in original_points], [point[1] for point in original_points], color='blue', label='Points')
-    plt.scatter([red_point[0]], [red_point[1]])
     
+    # Last point - start
+    plt.plot([chain[-1][0], red_point[0][0]], [chain[-1][1], red_point[0][1]], color='purple')
+    plt.scatter(red_point[:, 0], red_point[:, 1], color='red')
+
+    plt.imshow(map_image)
+    plt.title('Optimal Rogaining route planner')
+    plt.show()
+
+
 def main():
     # Select a map file
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
@@ -131,4 +138,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
