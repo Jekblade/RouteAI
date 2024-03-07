@@ -51,11 +51,11 @@ color_costs = {
     "black": 2,
     "yellow": 2,
     "blue": 5,
-    "brown": 10,
-    "dark_brown": 11,
-    "purple": 7,
+    "brown": 7,
+    "dark_brown": 8,
+    "purple": 6,
     "olive": 100,
-    "pink": 7
+    "pink": 6
 }
 
 
@@ -318,7 +318,7 @@ def main():
         plt.scatter(start_point[0], start_point[1], edgecolors='red', linewidths=2, s=100, marker='o') 
         plt.scatter(end_point[0], end_point[1], edgecolors='blue', linewidths=2, s=100, marker='o')  
         plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color = "magenta", linewidth=1)  # Plot the connection
-        plt.title('Optimal Route choice')
+        plt.title(f'Optimal Route Choice with Cost: {cost}')
         plt.show()
 
 if __name__ == "__main__":
