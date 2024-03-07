@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
 import networkx as nx
+from matplotlib.animation import FuncAnimation
 import os
 
 
@@ -43,19 +44,19 @@ main_color_values = {
 
 # Costs associated with terrain runnability
 color_costs = {
-    "white": 3,
-    "light_green": 4,
-    "green": 5,
-    "dark_green": 6,
-    "orange": 2,
-    "black": 2,
-    "yellow": 2,
-    "blue": 5,
-    "brown": 7,
-    "dark_brown": 8,
-    "purple": 6,
-    "olive": 100,
-    "pink": 6
+    "white": 1.5,
+    "light_green": 2,
+    "green": 2.5,
+    "dark_green": 3,
+    "orange": 1.2,
+    "black": 1,
+    "yellow": 1.1,
+    "blue": 2,
+    "brown": 3,
+    "dark_brown": 4,
+    "purple": 3,
+    "olive": 10,
+    "pink": 3
 }
 
 
@@ -92,13 +93,15 @@ def process_image(cropped_map_image):
     colors_to_check = [blue_id, black_id]
 
     for x in range(width):
-        color_counts = [np.count_nonzero(terrain_grid[x, :] == blue_id) for color_id in colors_to_check]
+        color_counts = [np.count_nonzero(terrain_grid[x, :] == color_id) for color_id in colors_to_check]
         total_pixels = height
 
         color_percentages = [count / total_pixels for count in color_counts]
 
         if any(percentage >= threshold for percentage in color_percentages):
-            terrain_grid[x, :] = 10
+            # replace horizon lines with dark_brown
+            for color_id in colors_to_check:
+                terrain_grid[x, terrain_grid[x, :] == color_id] = 10
 
    # Step 3: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
@@ -286,6 +289,12 @@ def calculate_path(terrain_costs, start_point, end_point):
     path, cost = find_path(terrain_costs, start_point, end_point)
     return path[::-1], cost
 
+def update(frame):
+    plt.clf()
+    nx.draw(G, with_labels=True, node_color='skyblue', node_size=500, font_size=10)
+    nx.draw_networkx_nodes(G, pos={shortest_path[frame]: shortest_path[frame]}, node_color='red', node_size=500)
+    nx.draw_networkx_edges(G, pos=nx.spring_layout(G), edgelist=[(shortest_path[i], shortest_path[i+1]) for i in range(frame)], edge_color='red')
+    plt.title(f"Frame {frame}")
 
 def main():
     # Select a map file
@@ -318,7 +327,7 @@ def main():
         plt.scatter(start_point[0], start_point[1], edgecolors='red', linewidths=2, s=100, marker='o') 
         plt.scatter(end_point[0], end_point[1], edgecolors='blue', linewidths=2, s=100, marker='o')  
         plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color = "magenta", linewidth=1)  # Plot the connection
-        plt.title(f'Optimal Route Choice with Cost: {cost}')
+        plt.title(f'Optimal Route Choice with Cost: {round(cost,2)}')
         plt.show()
 
 if __name__ == "__main__":

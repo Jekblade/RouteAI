@@ -3,13 +3,13 @@ import os
 from PIL import Image, ImageTk
 
 def execute_route_ai():
-    os.system("python RouteAI/RouteAI.py")
+    os.system("python3 RouteAI/RouteAI.py")
 
 def execute_map_convert():
-    os.system("python MapConvert/MapConvert.py")
+    os.system("python3 MapConvert/MapConvert.py")
 
 def execute_rogaining():
-    os.system("python Rogaining/Rogaining.py")
+    os.system("python3 Rogaining/Rogaining.py")
 
 def main():
     # Create the main window
