@@ -289,13 +289,6 @@ def calculate_path(terrain_costs, start_point, end_point):
     path, cost = find_path(terrain_costs, start_point, end_point)
     return path[::-1], cost
 
-def update(frame):
-    plt.clf()
-    nx.draw(G, with_labels=True, node_color='skyblue', node_size=500, font_size=10)
-    nx.draw_networkx_nodes(G, pos={shortest_path[frame]: shortest_path[frame]}, node_color='red', node_size=500)
-    nx.draw_networkx_edges(G, pos=nx.spring_layout(G), edgelist=[(shortest_path[i], shortest_path[i+1]) for i in range(frame)], edge_color='red')
-    plt.title(f"Frame {frame}")
-
 def main():
     # Select a map file
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
