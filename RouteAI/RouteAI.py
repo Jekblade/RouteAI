@@ -7,7 +7,6 @@ import networkx as nx
 from matplotlib.animation import FuncAnimation
 import os
 
-
 # Define main colors for categories
 main_colors = {
     0: "white",

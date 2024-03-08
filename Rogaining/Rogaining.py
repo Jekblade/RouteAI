@@ -114,7 +114,7 @@ def draw_shortest_path(points, map_image):
     plt.scatter([point[0] for point in original_points], [point[1] for point in original_points], color='blue', label='Points')
     
     # Last point - start
-    plt.plot([chain[-1][0], red_point[0][0]], [chain[-1][1], red_point[0][1]], color='purple')
+    plt.plot([chain[-1][0], red_point[0][0]], [chain[-1][1], red_point[0][1]], color='black')
     plt.scatter(red_point[:, 0], red_point[:, 1], color='red')
 
     plt.imshow(map_image)

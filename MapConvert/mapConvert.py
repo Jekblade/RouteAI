@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import copy
 import csv
 from scipy import ndimage
-import cv2
+from skimage import measure, feature
 import os
 
 # Define main colors for categories
@@ -70,33 +70,27 @@ def process_image(cropped_map_image):
     # Step 2: Artificial LIDAR height mapping
     lidar = np.copy(terrain_grid)
     dark_brown_id = 10
-    lidar_colors = [dark_brown_id]
 
     # Create a mask for elements that match lidar_colors
-    mask = np.isin(lidar, lidar_colors)
+    mask = np.isin(lidar, dark_brown_id)
     lidar[~mask] = 0
 
     mask = np.rot90(mask, k=1)
 
-    # Apply morphological operations to close gaps between adjacent dark brown pixels
-    mask_closed = ndimage.binary_closing(mask, structure=np.ones((3, 3)))
+    # Apply edge detection to identify prominent edges
+    edges = feature.canny(mask, sigma=1.5)
+    edges_with_mask = np.logical_or(mask, edges)
 
-    # Perform connected component analysis
-    labels, num_labels = measure.label(mask_closed, connectivity=2, return_num=True)
+    # Morphological operations to close gaps between adjacent dark brown pixels
+    mask_closed = ndimage.binary_closing(edges_with_mask, structure=np.ones((3, 3)))
 
-    # Remove outliers based on a threshold (e.g., size of connected components)
-    min_component_size = 100  # Adjust as needed
-    sizes = np.bincount(labels.ravel())
-    mask_closed = sizes[labels] >= min_component_size
-
-    # Get coordinates of the remaining dark brown pixels
     coords = np.argwhere(mask_closed)
 
-    # Plot the lidar points with their respective colors
     plt.figure(figsize=(8, 6))
-    plt.scatter(coords[:, 1], coords[:, 0], c='brown', s=6, marker='s')  # Plot points with id 9 in brown color
-    plt.title('Artificial LIDAR')
-    plt.gca().set_aspect('equal', adjustable='box')  # Set equal aspect ratio
+    plt.scatter(coords[:, 1], coords[:, 0], c='brown', s=1, marker='s')  # Plot points with id 9 in brown color
+    plt.title('Artificial LIDAR with Connected Missing Ends')
+    plt.colorbar(label='Region Label')
+    plt.gca().set_aspect('equal', adjustable='box')
     plt.show()
 
 
@@ -193,7 +187,7 @@ def main():
         plt.figure(figsize=(width/60, height/60)) 
         plt.scatter(x_flat, y_flat, c=color_rgb_flat / 255.0, marker='s')
         plt.title('Map interpretation with Adjusted Colors')
-
+        plt.show()
         plt.gca().set_aspect('equal', adjustable='box')  # Set equal aspect ratio
 
 if __name__ == "__main__":
