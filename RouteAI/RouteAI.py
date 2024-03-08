@@ -55,9 +55,9 @@ color_costs = {
     "blue": 3,
     "brown": 8,
     "dark_brown": 8,
-    "purple": 1000,
+    "purple": 10,
     "olive": 10,
-    "pink": 1000
+    "pink": 10
 }
 
 
