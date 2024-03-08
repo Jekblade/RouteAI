@@ -110,7 +110,7 @@ def draw_shortest_path(points, map_image):
     # Plot the points and connections
     plt.figure(figsize=(8, 6))
     for connection in connections:
-        plt.plot([connection[0][0], connection[1][0]], [connection[0][1], connection[1][1]], color='purple')
+        plt.plot([connection[0][0], connection[1][0]], [connection[0][1], connection[1][1]], color='black')
     plt.scatter([point[0] for point in original_points], [point[1] for point in original_points], color='blue', label='Points')
     
     # Last point - start

@@ -1,9 +1,11 @@
 import tkinter as tk
+from turtle import color
 from PIL import Image, ImageTk
 from tkinter import filedialog
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
+import itertools
 
 class PointSelectionApp:
     def __init__(self, master, map_image):
@@ -12,7 +14,6 @@ class PointSelectionApp:
 
         self.points = []
         self.red_point_selected = False
-        self.red_point = None
 
         self.canvas = tk.Canvas(master)
         self.canvas.pack(side="left", fill="y")
@@ -76,51 +77,114 @@ class PointSelectionApp:
         self.master.destroy()
 
 
-def minimum_spanning_tree(points, red_point, map_image):
-    points_array = np.array([point[:2] for point in points])
+# 1: MST
+def minimum_spanning_tree(points):
+    points_array = np.array([point for point in points])
     G = nx.Graph()
 
     for i, (x, y, _) in enumerate(points):
         G.add_node(i, pos=(x, y))
 
+    # Add edges between all pairs of nodes with calculated distances
     for i in range(len(points) - 1):
         for j in range(i + 1, len(points)):
             distance = np.linalg.norm(points_array[i] - points_array[j])
             G.add_edge(i, j, weight=distance)
 
-    # Ensure that the graph is connected
     if not nx.is_connected(G):
-        # If the graph is not connected, get the largest connected component
         largest_component = max(nx.connected_components(G), key=len)
         G = G.subgraph(largest_component).copy()
 
+    # Compute the minimum spanning tree (connect all points)
     MST = nx.minimum_spanning_tree(G)
+    print("\nMinimum spanning tree generated: ", MST)
+
     return MST
 
 
+
+# 2: Odd degree vertices
 def find_odd_degree_vertices(G):
     odd_degree_vertices = [v for v, d in G.degree() if d % 2 != 0]
+    print("Odd degree vertices: ", odd_degree_vertices)
     return odd_degree_vertices
 
-def find_min_weight_matching(G, vertices):
-    subgraph = G.subgraph(vertices)
-    min_weight_matching = nx.algorithms.matching.max_weight_matching(subgraph, weight='weight')
+
+
+# 3: Minimum distance nodes matching
+def find_min_weight_matching(odd_degree_vertices, G):
+    # This uses the full graph G to calculate distances between odd degree vertices
+    subgraph = G.subgraph(odd_degree_vertices)
+    min_weight_matching = nx.algorithms.matching.max_weight_matching(subgraph, maxcardinality=True, weight='weight')
+    print("Minimum weight matching: ", min_weight_matching)
+
     return min_weight_matching
 
+
+def tour_length(tour, points):
+    # Calculates the total length of the tour based on the points' coordinates
+    length = sum(np.linalg.norm(np.array(points[tour[i]]) - np.array(points[tour[i-1]])) for i in range(1, len(tour)))
+    return length
+
+
+# 4: Combine
 def combine_graphs(T, M):
-    G = nx.MultiGraph(T)
-    for edge in M:
-        G.add_edge(*edge)
+    G = nx.Graph(T.edges())
+    
+    for u, v in M:
+        G.add_edge(u, v)
     return G
 
+
 def generate_eulerian_tour(G):
+    is_connected = nx.is_connected(G)
+    print("Is the graph connected?", is_connected)
+
     eulerian_tour = list(nx.eulerian_circuit(G))
     return eulerian_tour
 
-def generate_tsp_tour(eulerian_tour):
-    tsp_tour = [eulerian_tour[i][0] for i in range(len(eulerian_tour))]
-    tsp_tour.append(eulerian_tour[0][0])
-    return tsp_tour
+
+def generate_tsp_tour(eulerian_tour, map_image, points):
+    tour = []
+    visited = set()
+    for u, v in eulerian_tour:
+        if u not in visited:
+            tour.append(u)
+            visited.add(u)
+    tour.append(tour[0])
+    return tour
+
+def two_opt_swap(tour, i, k):
+    return tour[:i] + tour[i:k+1][::-1] + tour[k+1:]
+
+def two_opt(tour, points):
+    """Improves the tour by repeatedly applying 2-opt swaps."""
+    improvement = True
+    while improvement:
+        improvement = False
+        for i in range(1, len(tour) - 2):
+            for k in range(i+1, len(tour)):
+                new_tour = two_opt_swap(tour, i, k)
+                if tour_length(new_tour, points) < tour_length(tour, points):
+                    tour = new_tour
+                    improvement = True
+    plt.scatter(points[0][0],points[0][1], color="red")
+    plt.scatter([point[0] for point in points[1:]], [point[1] for point in points[1:]], color="blue")
+
+    tsp_tour_unique = list(dict.fromkeys(tour))
+
+    # Extract x and y coordinates of the unique tsp_tour vertices
+    x = [points[i][0] for i in tsp_tour_unique]
+    y = [points[i][1] for i in tsp_tour_unique]
+    plt.plot(x, y, marker='o')
+    plt.scatter(points[tsp_tour_unique[-1]][0], points[tsp_tour_unique[-1]][1], color='red')  # End point
+
+    plt.title("Optimal Rogaining route using the Christofides algorithm")
+    plt.show()
+
+
+
+
 
 def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
@@ -131,42 +195,17 @@ def main():
         root.mainloop()
 
         if app.points:
-            if app.red_point in app.points:
-                red_point_index = app.points.index(app.red_point)
-                odd_degree_vertices.remove(red_point_index)
 
-            G = minimum_spanning_tree(app.points, app.red_point, map_image)
-            
-            if not nx.is_connected(G):
-                # Connect disconnected components
-                components = list(nx.connected_components(G))
-                for i in range(len(components) - 1):
-                    # Connect the components by adding an edge between arbitrary vertices
-                    u = list(components[i])[0]
-                    v = list(components[i + 1])[0]
-                    G.add_edge(u, v)
+            # Do some shenanigans
+            MST = minimum_spanning_tree(app.points)  # Needs implementation
+            odd_degree_vertices = find_odd_degree_vertices(MST)
+            min_weight_matching = find_min_weight_matching(odd_degree_vertices, MST)  # Adjusted to use MST for distances
+            combined_graph = combine_graphs(MST, min_weight_matching)
 
-            # Ensure all vertices have even degrees
-            odd_degree_vertices = find_odd_degree_vertices(G)
-            for vertex in odd_degree_vertices:
-                # Find a vertex with odd degree
-                neighbors = list(G.neighbors(vertex))
-                if len(neighbors) % 2 == 0:
-                    # If the number of neighbors is even, add an edge to one of them
-                    target_vertex = neighbors[0]  # Choose one of the neighbors arbitrarily
-                    G.add_edge(vertex, target_vertex)
-                else:
-                    # If the number of neighbors is odd, add a new vertex and connect it to the current vertex
-                    new_vertex = max(G.nodes) + 1  # Generate a new vertex label
-                    G.add_node(new_vertex)
-                    G.add_edge(vertex, new_vertex)
-
-
-            min_weight_matching = find_min_weight_matching(G, odd_degree_vertices)
-            combined_graph = combine_graphs(G, min_weight_matching)
             eulerian_tour = generate_eulerian_tour(combined_graph)
-            tsp_tour = generate_tsp_tour(eulerian_tour)
-            minimum_spanning_tree(app.points, app.red_point, map_image)
+            tsp_tour = generate_tsp_tour(eulerian_tour, map_image, app.points)
+            optimized_tour = two_opt(tsp_tour, app.points)  # Now directly optimizes the TSP tour
+            return
 
 if __name__ == "__main__":
     main()
