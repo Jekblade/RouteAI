@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import copy
 import csv
 from scipy import ndimage
-from skimage import measure, feature
+from skimage import measure, feature, morphology, filters
 import os
 
 # Define main colors for categories
@@ -78,14 +78,25 @@ def process_image(cropped_map_image):
     mask = np.rot90(mask, k=1)
 
     # Apply edge detection to identify prominent edges
-    edges = feature.canny(mask, sigma=1.5)
-    edges_with_mask = np.logical_or(mask, edges)
-
+    edges = feature.canny(mask, sigma=0.5)
     # Morphological operations to close gaps between adjacent dark brown pixels
-    mask_closed = ndimage.binary_closing(edges_with_mask, structure=np.ones((3, 3)))
+    mask_closed = morphology.binary_closing(edges, morphology.disk(3))
 
-    coords = np.argwhere(mask_closed)
+    # Compute skeleton of the binary image containing brown lines
+    skeleton = morphology.skeletonize(mask_closed)
 
+    # Calculate the distance transform of the skeleton image
+    distance_transform = filters.sobel(skeleton)
+
+    # Identify thickest parts of brown lines based on distance transform
+    thickest_parts = distance_transform > 1
+    distance_1 = morphology.binary_dilation(skeleton) ^ skeleton
+
+    # Combine the two identified regions
+    result = thickest_parts | distance_1
+    result |= skeleton
+
+    coords = np.argwhere(result)
     plt.figure(figsize=(8, 6))
     plt.scatter(coords[:, 1], coords[:, 0], c='brown', s=1, marker='s')  # Plot points with id 9 in brown color
     plt.title('Artificial LIDAR with Connected Missing Ends')
@@ -111,6 +122,7 @@ def process_image(cropped_map_image):
             # replace horizon lines with dark_brown
             for color_id in colors_to_check:
                 terrain_grid[x, terrain_grid[x, :] == color_id] = 2
+
 
    # Step 3: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
@@ -165,6 +177,7 @@ def process_image(cropped_map_image):
     return terrain_grid_f
 
 
+
 def main():
     # Select map image
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
@@ -184,12 +197,12 @@ def main():
         color_rgb_flat = np.array([main_color_values[main_colors[color_id]] for row in terrain_colors for color_id in row])
 
         # Create a scatter plot of the pixels with their respective main color values
-        plt.figure(figsize=(width/60, height/60)) 
+        plt.figure(figsize=(width/100, height/100)) 
         plt.scatter(x_flat, y_flat, c=color_rgb_flat / 255.0, marker='s')
         plt.title('Map interpretation with Adjusted Colors')
-        plt.show()
         plt.gca().set_aspect('equal', adjustable='box')  # Set equal aspect ratio
-
+        plt.show()
+        
 if __name__ == "__main__":
     main()
 
