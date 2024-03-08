@@ -5,6 +5,8 @@ from tkinter import filedialog
 import matplotlib.pyplot as plt
 import networkx as nx
 from matplotlib.animation import FuncAnimation
+from scipy import ndimage
+from skimage import measure, feature, morphology, filters
 import os
 
 # Define main colors for categories
@@ -50,12 +52,12 @@ color_costs = {
     "orange": 1.2,
     "black": 1,
     "yellow": 1.1,
-    "blue": 2,
-    "brown": 3,
-    "dark_brown": 4,
-    "purple": 3,
+    "blue": 3,
+    "brown": 8,
+    "dark_brown": 8,
+    "purple": 1000,
     "olive": 10,
-    "pink": 3
+    "pink": 1000
 }
 
 
@@ -83,8 +85,42 @@ def process_image(cropped_map_image):
             pixel = map_image_np[y, x]
             closest_color = find_closest_color(pixel)
             terrain_grid[x, y] = list(main_colors.keys())[list(main_colors.values()).index(closest_color)]
-    
-    # Step 2: Check for vertical lines and remove them (magnetic horizon lines)
+
+
+    # Step 2: Artificial LIDAR height mapping
+    lidar = np.copy(terrain_grid)
+    dark_brown_id = 10
+
+    # Create a mask for elements that match lidar_colors
+    mask = np.isin(lidar, dark_brown_id)
+    lidar[~mask] = 0
+
+    mask = np.rot90(mask, k=1)
+
+    # Apply edge detection to identify prominent edges
+    edges = feature.canny(mask, sigma=0.5)
+    # Morphological operations to close gaps between adjacent dark brown pixels
+    mask_closed = morphology.binary_closing(edges, morphology.disk(3))
+
+    # Compute skeleton of the binary image containing brown lines
+    skeleton = morphology.skeletonize(mask_closed)
+
+    # Calculate the distance transform of the skeleton image
+    distance_transform = filters.sobel(skeleton)
+
+    # Identify thickest parts of brown lines based on distance transform
+    thickest_parts = distance_transform > 1
+    distance_1 = morphology.binary_dilation(skeleton) ^ skeleton
+
+    # Combine the two identified regions
+    result = thickest_parts | distance_1
+    result |= skeleton
+
+    lidar_data = np.argwhere(result)
+    lidar_set = {(x, y) for x, y in lidar_data}
+
+
+    # Step 3: Check for vertical lines and remove them (magnetic horizon lines)
     blue_id = 7
     black_id = 5
     threshold = 0.4
@@ -100,9 +136,10 @@ def process_image(cropped_map_image):
         if any(percentage >= threshold for percentage in color_percentages):
             # replace horizon lines with dark_brown
             for color_id in colors_to_check:
-                terrain_grid[x, terrain_grid[x, :] == color_id] = 10
+                terrain_grid[x, terrain_grid[x, :] == color_id] = 2
 
-   # Step 3: Black pixel classification - connecting roads and trails
+
+   # Step 4: Black pixel classification - connecting roads and trails
     terrain_grid_final = np.copy(terrain_grid)
 
     for y in range(0, height):
@@ -150,8 +187,8 @@ def process_image(cropped_map_image):
                             px, py = x + i, y + j
                             if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
                                 terrain_grid_final[px, py] = black_id
-
-    return terrain_grid_final
+    
+    return terrain_grid_final, lidar_set
 
 
 class PointSelectionApp:
@@ -241,14 +278,19 @@ def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_siz
 
 
 # Calculating the terrain costs
-def calculate_terrain_costs(terrain_colors):
+def calculate_terrain_costs(terrain_colors, lidar_set):
     width, height = terrain_colors.shape
     terrain_costs = np.zeros((width, height), dtype=float)
 
+    # Layer 1
     for i in range(width):
         for j in range(height):
             color_name = main_colors[terrain_colors[i, j]]
             terrain_costs[i, j] = color_costs[color_name]
+            
+            # Layer 2 (height terrain)
+            if (i, j) in lidar_set:
+                terrain_costs[i, j] += 18
 
     return terrain_costs
 
@@ -304,10 +346,10 @@ def main():
 
         # Crop the map around the points
         cropped_map_image, start_point, end_point, crop_offset = crop_map_around_points(map_image, raw_start_point, raw_end_point)
-        terrain_colors = process_image(cropped_map_image)
+        terrain_colors, lidar_set = process_image(cropped_map_image)
 
         # Calculate the terrain costs
-        terrain_costs = calculate_terrain_costs(terrain_colors)
+        terrain_costs = calculate_terrain_costs(terrain_colors, lidar_set)
 
         # Calculate the lowest cost path
         path, cost = calculate_path(terrain_costs, start_point, end_point)
