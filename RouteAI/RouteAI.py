@@ -9,38 +9,52 @@ from scipy import ndimage
 from skimage import measure, feature, morphology, filters
 import os
 
-# Define main colors for categories
+# Definint main color categories
 main_colors = {
     0: "white",
-    1: "light_green",
-    2: "green",
-    3: "dark_green",
-    4: "orange",
-    5: "black",
-    6: "yellow",
+    1: "yellow",
+    2: "orange",
+    3: "light_green",
+    4: "green",
+    5: "dark_green",
+    6: "light_blue",
     7: "blue",
     8: "olive",
-    9: "brown",
-    10: "dark_brown",
-    11: "purple",
-    12: "pink"
+    #--------------
+    9: "black",
+    10: "road_orange",
+    11: "brown1",
+    12: "brown2",
+    13: "brown3",
+    14: "brown4",
+    15: "purple1",
+    16: "purple2",
+    17: "pink1",
+    18: "pink2"
 }
 
-# RGB values for main colors
+# RGB values for main colors (hand-picked and averaged between various maps)
 main_color_values = {
     "white": (255, 255, 255),
-    "light_green": (204, 224, 191),
-    "green": (150, 200, 150),
-    "dark_green": (85, 165, 95),
-    "orange": (245, 210, 150),
-    "black": (50, 50, 50),
-    "yellow": (250, 200, 90),
-    "blue": (80, 180, 220),
-    "olive": (150, 150, 50),
-    "brown": (210, 175, 150),
-    "dark_brown": (170, 80, 30),
-    "purple": (130, 20, 115),
-    "pink": (225, 125, 172),
+    "yellow": (250, 190, 75),
+    "orange": (253, 217, 148),
+    "light_green": (196, 230, 190),
+    "green": (140, 205, 130),
+    "dark_green": (40, 170, 80),
+    "light_blue": (120, 220, 230),
+    "blue": (0, 160, 215),
+    "olive": (160, 158, 58),
+    #------------------------
+    "black": (40, 40, 40),
+    "road_orange": (228, 170, 120),
+    "brown1": (190, 105, 0),
+    "brown2": (190, 105, 40),
+    "brown3": (218, 155, 110),
+    "brown4": (180, 172, 112),
+    "purple1": (136, 0, 160),
+    "purple2": (150, 70, 140),
+    "pink1": (215, 0, 120),
+    "pink2": (195, 31, 255)
 }
 
 # Costs associated with terrain runnability
@@ -49,7 +63,6 @@ color_costs = {
     "light_green": 2,
     "green": 2.5,
     "dark_green": 3,
-    "orange": 1.2,
     "black": 1,
     "yellow": 1.1,
     "blue": 3,
@@ -136,7 +149,7 @@ def process_image(cropped_map_image):
         if any(percentage >= threshold for percentage in color_percentages):
             # replace horizon lines with dark_brown
             for color_id in colors_to_check:
-                terrain_grid[x, terrain_grid[x, :] == color_id] = 2
+                terrain_grid[x, terrain_grid[x, :] == color_id] = 3
 
 
    # Step 4: Black pixel classification - connecting roads and trails
