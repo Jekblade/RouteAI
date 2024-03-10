@@ -9,36 +9,50 @@ from scipy import ndimage
 from skimage import measure, feature, morphology, filters
 import os
 
-# Define main colors for categories
+# Definint main color categories
 main_colors = {
     0: "white",
-    1: "light_green",
-    2: "green",
-    3: "dark_green",
-    5: "black",
-    6: "yellow",
+    1: "yellow",
+    2: "orange",
+    3: "light_green",
+    4: "green",
+    5: "dark_green",
+    6: "light_blue",
     7: "blue",
     8: "olive",
-    9: "brown",
-    10: "dark_brown",
-    11: "purple",
-    12: "pink"
+    #--------------
+    9: "black",
+    10: "road_orange",
+    11: "brown1",
+    12: "brown2",
+    13: "brown3",
+    14: "purple1",
+    15: "purple2",
+    16: "pink1",
+    17: "pink2"
 }
 
-# RGB values for main colors
+# RGB values for main colors (hand-picked and averaged between various maps)
 main_color_values = {
     "white": (255, 255, 255),
-    "light_green": (204, 224, 191),
-    "green": (150, 200, 150),
-    "dark_green": (85, 165, 95),
-    "black": (50, 50, 50),
-    "yellow": (250, 200, 90),
-    "blue": (80, 180, 220),
-    "olive": (150, 150, 50),
-    "brown": (230, 190, 150),
-    "dark_brown": (170, 80, 30),
-    "purple": (130, 20, 115),
-    "pink": (225, 125, 172)
+    "yellow": (250, 190, 75),
+    "orange": (253, 217, 148),
+    "light_green": (196, 230, 190),
+    "green": (140, 205, 130),
+    "dark_green": (40, 170, 80),
+    "light_blue": (120, 220, 230),
+    "blue": (0, 160, 215),
+    "olive": (160, 158, 58),
+    #------------------------
+    "black": (0, 0, 0),
+    "road_orange": (228, 170, 120),
+    "brown1": (190, 105, 0),
+    "brown2": (190, 105, 40),
+    "brown3": (218, 155, 110),
+    "purple1": (136, 0, 160),
+    "purple2": (150, 70, 140),
+    "pink1": (215, 0, 120),
+    "pink2": (195, 31, 255)
 }
 
 def find_closest_color(pixel):
@@ -69,7 +83,7 @@ def process_image(cropped_map_image):
 
     # Step 2: Artificial LIDAR height mapping
     lidar = np.copy(terrain_grid)
-    dark_brown_id = 10
+    dark_brown_id = 11
 
     # Create a mask for elements that match lidar_colors
     mask = np.isin(lidar, dark_brown_id)
@@ -79,22 +93,16 @@ def process_image(cropped_map_image):
 
     # Apply edge detection to identify prominent edges
     edges = feature.canny(mask, sigma=0.5)
-    # Morphological operations to close gaps between adjacent dark brown pixels
+
     mask_closed = morphology.binary_closing(edges, morphology.disk(3))
-
-    # Compute skeleton of the binary image containing brown lines
     skeleton = morphology.skeletonize(mask_closed)
-
-    # Calculate the distance transform of the skeleton image
     distance_transform = filters.sobel(skeleton)
 
     # Identify thickest parts of brown lines based on distance transform
-    thickest_parts = distance_transform > 1
+    thickest_parts = distance_transform > 1 
     distance_1 = morphology.binary_dilation(skeleton) ^ skeleton
 
-    # Combine the two identified regions
     result = thickest_parts | distance_1
-    result |= skeleton
 
     coords = np.argwhere(result)
     plt.figure(figsize=(8, 6))
@@ -102,15 +110,16 @@ def process_image(cropped_map_image):
     plt.title('Artificial LIDAR with Connected Missing Ends')
     plt.colorbar(label='Region Label')
     plt.gca().set_aspect('equal', adjustable='box')
-    plt.show()
+
 
 
     # Step 2: Check for vertical lines and remove them (magnetic horizon lines)
+    light_blue_id = 6
     blue_id = 7
-    black_id = 5
+    black_id = 9
     threshold = 0.5
 
-    colors_to_check = [blue_id, black_id]
+    colors_to_check = [light_blue_id, blue_id, black_id]
 
     for x in range(width):
         color_counts = [np.count_nonzero(terrain_grid[x, :] == color_id) for color_id in colors_to_check]
@@ -118,10 +127,10 @@ def process_image(cropped_map_image):
 
         color_percentages = [count / total_pixels for count in color_counts]
 
+        # replace horizon lines with light_green
         if any(percentage >= threshold for percentage in color_percentages):
-            # replace horizon lines with dark_brown
             for color_id in colors_to_check:
-                terrain_grid[x, terrain_grid[x, :] == color_id] = 2
+                terrain_grid[x, terrain_grid[x, :] == color_id] = 3
 
 
    # Step 3: Black pixel classification - connecting roads and trails
@@ -202,7 +211,7 @@ def main():
         plt.title('Map interpretation with Adjusted Colors')
         plt.gca().set_aspect('equal', adjustable='box')  # Set equal aspect ratio
         plt.show()
-        
+
 if __name__ == "__main__":
     main()
 
