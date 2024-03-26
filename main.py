@@ -8,13 +8,43 @@ import webbrowser
 root = tk.Tk()
 buttons = []
 
+# On hover:
+class HoverButton(tk.Button):
+    def __init__(self, master=None, **kw):
+        tk.Button.__init__(self, master=master, **kw)
+        self.default_bg = self["background"]
+        self.bind("<Enter>", self.on_enter)
+        self.bind("<Leave>", self.on_leave)
+
+    def on_enter(self, event):
+        self["background"] = "light blue"
+        self.show_image()
+
+    def on_leave(self, event):
+        self["background"] = self.default_bg
+        self.hide_image()
+
+    def show_image(self):
+        button_name = self.cget("text")
+        image_path = f"files/images/{button_name}.png"
+        if os.path.exists(image_path):
+            self.image = Image.open(image_path)
+            self.image = self.image.resize((150, 150))
+            self.image = ImageTk.PhotoImage(self.image)
+            self.image_label = tk.Label(root, image=self.image)
+            self.image_label.place(relx=1.1, rely=0.5, anchor='center')
+
+    def hide_image(self):
+        if hasattr(self, 'image_label'):
+            self.image_label.destroy()
+
+#Buttons
 def route_ai():
     hide_main_buttons()
     show_route_ai_ui()
 
 def map_convert():
-    hide_main_buttons()
-    show_map_convert_ui()
+    os.system('python3 MapConvert/mapConvert.py')
 
 def rogaining():
     hide_main_buttons()
@@ -32,47 +62,31 @@ def show_route_ai_ui():
     buttons.append(route_ai_label)
 
     # Create buttons 
-    least_cost_button = tk.Button(root, text="LowestCostPath alg", font=('Roboto', 28), command=(execute_least_cost))
-    least_cost_button.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
+    djikstras_button = HoverButton(root, text="Djikstras Alg (pixel by pixel)", font=('Roboto', 28), command=(execute_djikstras))
+    djikstras_button.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
+    buttons.append(djikstras_button)
+
+    least_cost_button = HoverButton(root, text="LowestCostPath (manual approach)", font=('Roboto', 28), command=(execute_least_cost))
+    least_cost_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
     buttons.append(least_cost_button)
 
-    djikstras_button = tk.Button(root, text="Djikstras alg", font=('Roboto', 28), command=(execute_djikstras))
-    djikstras_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
-    buttons.append(djikstras_button)
+    djikstras_area_button = HoverButton(root, text="RouteAI (Djikstras+Area)", font=('Roboto', 28), command=(execute_djikstras_area))
+    djikstras_area_button.place(relx=0.5, rely=0.6, anchor=tk.CENTER)
+    buttons.append(djikstras_area_button)
 
     back_button = tk.Button(root, text="Back", font=('Roboto', 28), bg="gray", command=show_main_buttons)
     back_button.place(relx=0.5, rely=0.8, anchor=tk.CENTER, y=60)
     buttons.append(back_button)
 
-def execute_least_cost():
-    os.system("python3 RouteAI/LeastCostPath.py")
-
 def execute_djikstras():
     os.system("python3 RouteAI/DjikstrasAlg.py")
 
+def execute_least_cost():
+    os.system("python3 RouteAI/LeastCostPath.py")
 
-def show_map_convert_ui():
-    map_convert_label = tk.Label(root, text=" Map convert ", font=('Roboto', 35))
-    map_convert_label.place(relx=0.5, rely=0.3, anchor=tk.CENTER, y=-50)
-    buttons.append(map_convert_label)
+def execute_djikstras_area():
+    os.system("python3 RouteAI/DjikstrasAREA.py")
 
-    map_convert_button = tk.Button(root, text="MapConvert", font=('Roboto', 28), command=(map_convert))
-    map_convert_button.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
-    buttons.append(map_convert_button)
-
-    terrain_button = tk.Button(root, text="Artificial Terrain", font=('Roboto', 28), command=(execute_lidar))
-    terrain_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
-    buttons.append(terrain_button)
-
-    back_button = tk.Button(root, text="Back", font=('Roboto', 28), bg="gray",  command=show_main_buttons)
-    back_button.place(relx=0.5, rely=0.8, anchor=tk.CENTER, y=60)
-    buttons.append(back_button)
-
-def execute_map_convert():
-    os.system("python3 MapConvert/MapConvert.py")
-
-def execute_lidar():
-    os.system("python3 MapConvert/lidar.py")
 
 
 def show_rogaining_ui():
@@ -80,11 +94,11 @@ def show_rogaining_ui():
     rogaining_label.place(relx=0.5, rely=0.3, anchor=tk.CENTER, y=-50)
     buttons.append(rogaining_label)
 
-    nearest_neighbour_button = tk.Button(root, text="Nearest Neighbours", font=('Roboto', 28), command=(execute_nearest_neighbour))
+    nearest_neighbour_button = HoverButton(root, text="Nearest Neighbours", font=('Roboto', 28), command=(execute_nearest_neighbour))
     nearest_neighbour_button.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
     buttons.append(nearest_neighbour_button)
 
-    christofides_button = tk.Button(root, text="Christofides Method", font=('Roboto', 28), command=(execute_christofides))
+    christofides_button = HoverButton(root, text="Christofides Method", font=('Roboto', 28), command=(execute_christofides))
     christofides_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
     buttons.append(christofides_button)
 
@@ -93,10 +107,10 @@ def show_rogaining_ui():
     buttons.append(back_button)
 
 def execute_nearest_neighbour():
-    os.system("python3 MapConvert/NearestNeighbour.py")
+    os.system("python3 Rogaining/NearestNeighbour.py")
 
 def execute_christofides():
-    os.system("python3 MapConvert/Christofides.py")
+    os.system("python3 Rogaining/Christofides.py")
 
 
 def donate_paypal():
@@ -113,15 +127,15 @@ def show_main_buttons():
     choose_label.place(relx=0.5, rely=0.3, anchor=tk.CENTER, y=-50)
     buttons.append(choose_label)
 
-    route_ai_button = tk.Button(root, text="RouteAI", font=('Roboto',28), command=route_ai)
+    route_ai_button = HoverButton(root, text="RouteAI", font=('Roboto',28), command=route_ai)
     route_ai_button.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
     buttons.append(route_ai_button)
 
-    map_convert_button = tk.Button(root, text="MapConvert", font=('Roboto',28), command=map_convert)
+    map_convert_button = HoverButton(root, text="MapConvert", font=('Roboto',28), command=map_convert)
     map_convert_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
     buttons.append(map_convert_button)
 
-    rogaining_button = tk.Button(root, text="Rogaining", font=('Roboto',28), command=rogaining)
+    rogaining_button = HoverButton(root, text="Rogaining", font=('Roboto',28), command=rogaining)
     rogaining_button.place(relx=0.5, rely=0.6, anchor=tk.CENTER,)
     buttons.append(rogaining_button)
 
@@ -155,10 +169,6 @@ def main():
     # Display the background image
     background_label = tk.Label(root, image=background_photo)
     background_label.place(x=0, y=0, relwidth=1, relheight=1)
-
-    # Define button styles
-    button_font = ('Roboto', 28) 
-    button_padding = 60
 
     show_main_buttons()
 

@@ -1,3 +1,55 @@
+def trails(terrain_grid):
+
+    # Step 3: Black pixel classification - connecting roads and trails
+    terrain_grid_final = np.copy(terrain_grid)
+
+    for y in range(0, height):
+        for x in range(0, width):
+            if terrain_grid[x, y] == black_id:
+                max_connectivity = 0
+                best_direction = (0, 0)
+                
+                # Analyze the 5x5 grid around the black pixel
+                for dx in range(-2, 3):
+                    for dy in range(-2, 3):
+                        # Skip the current pixel
+                        if dx == 0 and dy == 0:
+                            continue
+
+                        # Count connectivity in the current direction
+                        connectivity = 0
+                        for i in range(-1, 2):  # Check one more pixel in each direction
+                            px, py = x + i * dx, y + i * dy
+                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] == black_id:
+                                connectivity += 1
+
+                        if connectivity > max_connectivity:
+                            max_connectivity = connectivity
+                            best_direction = (dx, dy)
+
+                # Mark pixels based on the best direction
+                if best_direction[0] == 0 or best_direction[1] == 0:  # Horizontal or vertical direction
+                    for i in range(-2, 3):
+                        for j in range(-2, 3):
+                            px, py = x + i * best_direction[0], y + j * best_direction[1]
+                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
+                                terrain_grid_final[px, py] = black_id
+                else:  # Diagonal direction
+                    for i in range(-1, 2):
+                        for j in range(-1, 2):
+                            # Skip marking the corners based on the best diagonal direction
+                            if (i * best_direction[0] == -1 and j * best_direction[1] == -1) or \
+                            (i * best_direction[0] == -1 and j * best_direction[1] == 1) or \
+                            (i * best_direction[0] == 1 and j * best_direction[1] == -1) or \
+                            (i * best_direction[0] == 1 and j * best_direction[1] == 1):
+                                continue
+
+                            px, py = x + i, y + j
+                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
+                                terrain_grid_final[px, py] = black_id
+    return terrain_grid_final
+
+
 def calculate_lowest_cost_path(terrain_costs, start_point, end_point):
     # Calculate the lowest cost path from start to end
     start_to_end_path, start_to_end_cost = _calculate_single_path(terrain_costs, start_point, end_point)
@@ -69,7 +121,11 @@ def _calculate_single_path(terrain_costs, start_point, end_point):
 
     return path[::-1], dp[end_point]
 
-
+'Step 1: Map Interpretation with Adjusted Colors', 
+                'Step 2: Base Layer Masking', 
+                'Step 3: Artificial LIDAR Mapping', 
+                'Step 4: Remove Vertical Lines (Magnetic Horizon Lines)',
+                'Step 5: Black Pixel Classification - Connecting Roads and Trails'
 
 
 def draw_shortest_path(points, map_image):
@@ -230,3 +286,36 @@ def main():
 
             plt.title('Optimal rogaining route planning')
             plt.show()
+
+
+
+# -=-=-=-=-=-=-=-
+# Step 4: Connecting roads and trails
+def trails_paths(raw_terrain_grid):
+    
+    trails_grid = np.copy(terrain_grid)
+    black_id = 9
+
+    # Create a mask for black color
+    mask = np.isin(trails_grid, black_id)
+    mask = morphology.remove_small_objects(mask, min_size=4)
+    mask = np.rot90(mask, k=1)
+
+    # Detect paths:
+    edges = feature.canny(mask, sigma=0.5)
+
+    # Close gaps between disconnected paths
+    trails_connected = morphology.binary_closing(edges, morphology.disk(4))
+
+    # Detect mistakes, adjust width of all paths
+    skeleton = morphology.skeletonize(trails_connected)
+
+    distance_transform = filters.sobel(skeleton)
+
+    thickest_parts = distance_transform >= 1
+    distance = morphology.binary_dilation(skeleton) ^ skeleton
+
+    # Combine all edits into one
+    paths = thickest_parts | distance | skeleton
+    
+    return paths
