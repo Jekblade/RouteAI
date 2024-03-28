@@ -3,83 +3,47 @@ import numpy as np
 import heapq
 import tkinter as tk
 from tkinter import filedialog
+from tkinter.simpledialog import Dialog
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 import time
+import os
 
-# Define main colors for categories
-main_colors = {
-    0: "white",
-    1: "yellow",
-    2: "orange",
-    3: "light_green",
-    4: "green",
-    5: "dark_green",
-    6: "light_blue",
-    7: "blue",
-    8: "olive",
-    #--------------
-    9: "black",
-    10: "brown1",
-    11: "brown2",
-    12: "brown3",
-    13: "purple1",
-    14: "purple2",
-    15: "pink1",
-    16: "pink2",
-    17: "red"
-}
+class ModeSelectionDialog(Dialog):
+    def body(self, master):
+        self.title("Map type")
+        self.geometry("300x200")
 
-# RGB values for main colors
-main_color_values = {
-    "white": (255, 255, 255),
-    "yellow": (250, 190, 75),
-    "orange": (253, 217, 148),
-    "light_green": (196, 230, 190),
-    "green": (140, 205, 130),
-    "dark_green": (40, 170, 80),
-    "light_blue": (120, 220, 230),
-    "blue": (0, 160, 215),
-    "olive": (160, 158, 58),
-    #------------------------
-    "black": (40, 40, 40),
-    "brown1": (190, 105, 40),
-    "brown2": (180, 172, 112),
-    "brown3": (130, 140, 75),
-    "purple1": (136, 0, 160),
-    "purple2": (150, 70, 140),
-    "pink1": (215, 0, 120),
-    "pink2": (195, 31, 255),
-    "red": (135, 10, 50)
-}
+        # Calculate position for center of screen
+        window_width = self.winfo_reqwidth()
+        window_height = self.winfo_reqheight()
+        position_right = int(self.winfo_screenwidth()/2 - window_width/2)
+        position_down = int(self.winfo_screenheight()/2 - window_height/2)
+        self.geometry("+{}+{}".format(position_right, position_down))
 
-# Costs associated with terrain runnability
-color_costs = {
-    "white": 1.6, 
-    "yellow": 1.2,
-    "orange": 1.4,
-    "light_green": 3,
-    "green": 4.5,
-    "dark_green": 6,
-    "light_blue": 5,
-    "blue": 5,
-    "olive": 100,
-    #------------------------
-    "black": 1,
-    "brown1": 30,
-    "brown2": 30,
-    "brown3": 30,
-    "purple1": 50,
-    "purple2": 50,
-    "pink1": 50,
-    "pink2": 50,
-    "red": 50
-}
+        tk.Label(master, text="Choose orienteering map type").pack()
+        return None  
 
+    def buttonbox(self):
+        # Remove default buttons
+        box = tk.Frame(self)
 
+        # Add custom buttons
+        tk.Button(box, text="Forest", command=lambda: self.done("Forest")).pack(side=tk.LEFT, padx=5, pady=5)
+        tk.Button(box, text="Sprint", command=lambda: self.done("Sprint")).pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.bind("<Return>", lambda event: self.done("Forest"))
+        self.bind("<Escape>", lambda event: self.done("Sprint"))
+
+        box.pack()
+
+    def done(self, result):
+        self.result = result
+        self.destroy()
 
 class PointSelectionApp:
     def __init__(self, master, map_image):
+           
         self.master = master
         self.master.title("Selection of start point and end point")
 
@@ -193,7 +157,7 @@ def crop_map_around_points(map_image, raw_start_point, raw_end_point, area):
 
 
 # IMAGE PROCESSING
-def process_image(cropped_image):
+def process_image(cropped_image, main_colors, main_color_values, color_tree):
     
     process_time = time.time()
     progress = 0
@@ -210,7 +174,7 @@ def process_image(cropped_image):
     
         for x in range(width):
             pixel = map_image_np[y, x]
-            closest_color = find_closest_color(pixel)
+            closest_color = find_closest_color(pixel, main_color_values, color_tree)
             terrain_grid[x, y] = list(main_colors.keys())[list(main_colors.values()).index(closest_color)]
     
     print(f"    Processing image ({width}x{height} pixels): {round((time.time() - process_time), 3)}s", end='\r')
@@ -299,10 +263,8 @@ def process_image(cropped_image):
     return terrain_grid_final
 
 
-# Create a k-d tree for the main colors
-color_tree = KDTree(list(main_color_values.values()))
 
-def find_closest_color(pixel):
+def find_closest_color(pixel, main_color_values, color_tree):
     # Query the k-d tree to find the closest color
     _, index = color_tree.query(pixel[:3])
 
@@ -312,7 +274,7 @@ def find_closest_color(pixel):
 
 
 # Calculating the terrain costs
-def calculate_terrain_costs(terrain_colors):
+def calculate_terrain_costs(terrain_colors, color_costs, main_colors):
     width, height = terrain_colors.shape
     terrain_costs = np.zeros((width, height), dtype=float)
     terrain_time = time.time()
@@ -383,23 +345,170 @@ def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
-    
 
+
+        # Choosing forest or sprint map
         root = tk.Tk()
+        choice = ModeSelectionDialog(root).result
+
+        if choice == 'Forest':
+
+            main_colors = {
+                0: "white",
+                1: "yellow",
+                2: "orange",
+                3: "light_green",
+                4: "green",
+                5: "dark_green",
+                6: "light_blue",
+                7: "blue",
+                8: "olive",
+                9: "black",
+                10: "brown1",
+                11: "brown2",
+                12: "brown3",
+                13: "purple1",
+                14: "purple2",
+                15: "pink1",
+                16: "pink2",
+                17: "red"
+            }
+
+            # RGB values for main colors
+            main_color_values = {
+                "white": (255, 255, 255),
+                "yellow": (250, 190, 75),
+                "orange": (253, 217, 148),
+                "light_green": (196, 230, 190),
+                "green": (140, 205, 130),
+                "dark_green": (40, 170, 80),
+                "light_blue": (120, 220, 230),
+                "blue": (0, 160, 215),
+                "olive": (160, 158, 58),
+                "black": (40, 40, 40),
+                "brown1": (190, 105, 40),
+                "brown2": (180, 172, 112),
+                "brown3": (130, 140, 75),
+                "purple1": (136, 0, 160),
+                "purple2": (150, 70, 140),
+                "pink1": (215, 0, 120),
+                "pink2": (195, 31, 255),
+                "red": (135, 10, 50)
+            }
+
+            # Costs associated with terrain runnability
+            color_costs = {
+                "white": 1.6, 
+                "yellow": 1.2,
+                "orange": 1.4,
+                "light_green": 3,
+                "green": 4.5,
+                "dark_green": 6,
+                "light_blue": 5,
+                "blue": 5,
+                "olive": 100,
+                "black": 1,
+                "brown1": 30,
+                "brown2": 30,
+                "brown3": 30,
+                "purple1": 50,
+                "purple2": 50,
+                "pink1": 50,
+                "pink2": 50,
+                "red": 50
+            }
+
+        elif choice == 'Sprint':
+
+            main_colors = {
+                0: "white",
+                1: "yellow",
+                2: "orange",
+                3: "light_green",
+                4: "green",
+                5: "dark_green",
+                6: "light_blue",
+                7: "blue",
+                8: "olive",
+                9: "black",
+                10: "brown1",
+                11: "brown2",
+                12: "brown3",
+                13: "purple1",
+                14: "purple2",
+                15: "pink1",
+                16: "pink2",
+                17: "red",
+                18: "gray",
+                19: "road_orange"
+            }
+
+            main_color_values = {
+                "white": (255, 255, 255),
+                "yellow": (250, 190, 75),
+                "orange": (253, 217, 148),
+                "light_green": (196, 230, 190),
+                "green": (140, 205, 130),
+                "dark_green": (40, 170, 80),
+                "light_blue": (120, 220, 230),
+                "blue": (0, 160, 215),
+                "olive": (160, 158, 58),
+                "black": (40, 40, 40),
+                "brown1": (190, 105, 40),
+                "brown2": (180, 172, 112),
+                "brown3": (130, 140, 75),
+                "purple1": (136, 0, 160),
+                "purple2": (150, 70, 140),
+                "pink1": (215, 0, 120),
+                "pink2": (195, 31, 255),
+                "red": (135, 10, 50),
+                "gray": (138, 138, 138),
+                "road_orange": (225, 195, 165)
+            }
+
+            # Costs associated with terrain runnability
+            color_costs = {
+                "white": 1.6, 
+                "yellow": 1.2,
+                "orange": 1.4,
+                "light_green": 3,
+                "green": 4.5,
+                "dark_green": 6,
+                "light_blue": 5,
+                "blue": 5,
+                "olive": 100,
+                "black": 100,
+                "gray": 100,
+                "road_orange": 1.1,
+                "brown1": 30,
+                "brown2": 30,
+                "brown3": 30,
+                "purple1": 50,
+                "purple2": 50,
+                "pink1": 50,
+                "pink2": 50,
+                "red": 50
+            }
+
+        # Create the GUI for selecting the start and end points
         app = PointSelectionApp(root, map_image)
         root.mainloop()
 
-        # Get the selected points
         raw_start_point = (int(app.points[0][0]), int(app.points[0][1]))
         raw_end_point = (int(app.points[1][0]), int(app.points[1][1]))
 
         final_time = time.time()
+
         # Crop the map around the points
         cropped_image, start_point, end_point = crop_map_around_points(map_image, raw_start_point, raw_end_point, app.area)
 
-        # Process image
-        terrain_colors = process_image(cropped_image)
-        terrain_costs = calculate_terrain_costs(terrain_colors)
+
+        # -=-=-=- Process image -=-=-=-=-
+
+        color_tree = KDTree(list(main_color_values.values()))   # Create a k-d tree for the main colors to match the closest
+
+        terrain_colors = process_image(cropped_image, main_colors, main_color_values, color_tree)
+        terrain_costs = calculate_terrain_costs(terrain_colors, color_costs, main_colors)
 
         # Calculate the lowest cost path
         path, cost = calculate_lowest_cost_path(terrain_costs, start_point, end_point)
