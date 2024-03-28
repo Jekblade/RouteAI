@@ -85,7 +85,8 @@ def process_image(cropped_map_image):
             pixel = map_image_np[y, x]
             closest_color = find_closest_color(pixel)
             terrain_grid[x, y] = list(main_colors.keys())[list(main_colors.values()).index(closest_color)]
-        
+    
+    
 
     return terrain_grid
 

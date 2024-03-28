@@ -62,15 +62,15 @@ def show_route_ai_ui():
     buttons.append(route_ai_label)
 
     # Create buttons 
-    djikstras_button = HoverButton(root, text="Djikstras Alg (pixel by pixel)", font=('Roboto', 28), command=(execute_djikstras))
-    djikstras_button.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
-    buttons.append(djikstras_button)
-
-    least_cost_button = HoverButton(root, text="LowestCostPath (manual approach)", font=('Roboto', 28), command=(execute_least_cost))
-    least_cost_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+    least_cost_button = HoverButton(root, text="Lowest Cost Path method", font=('Roboto', 28), command=(execute_least_cost))
+    least_cost_button.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
     buttons.append(least_cost_button)
 
-    djikstras_area_button = HoverButton(root, text="RouteAI (Djikstras+Area)", font=('Roboto', 28), command=(execute_djikstras_area))
+    djikstras_button = HoverButton(root, text="Djikstras Algorithm", font=('Roboto', 28), command=(execute_djikstras))
+    djikstras_button.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+    buttons.append(djikstras_button)
+
+    djikstras_area_button = HoverButton(root, text="Experimental", font=('Roboto', 24), command=(execute_djikstras_area))
     djikstras_area_button.place(relx=0.5, rely=0.6, anchor=tk.CENTER)
     buttons.append(djikstras_area_button)
 
