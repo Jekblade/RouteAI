@@ -84,6 +84,7 @@ class PointSelectionApp:
         self.master.title("Selection of start point and end point")
 
         self.points = []
+        self.area = []
         self.start_point_selected = False
         self.finish_point_selected = False
 
@@ -106,7 +107,7 @@ class PointSelectionApp:
 
         # Actions
         self.canvas.bind("<Button-1>", self.add_point)
-        self.master.bind("<Return>", self.complete_selection)
+        self.master.bind("<Return>", self.select_area)
 
 
     def add_point(self, event):
@@ -115,11 +116,8 @@ class PointSelectionApp:
         if len(self.points) <= 2:
            
             if not self.start_point_selected:
-                # Remove previously selected start point if exists
-                if len(self.points) > 0:
-                    self.canvas.delete(self.points[-1][2])
 
-                # Draw the points
+                # Draw the start point
                 start_point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline="red", width=2, fill='')
                 self.points.append((x, y, start_point_item))
                 self.start_point_selected = True
@@ -131,27 +129,63 @@ class PointSelectionApp:
                 self.points.append((x, y, finish_point_item))
                 self.finish_point_selected = True
 
+    def select_area(self, event):
+        if self.finish_point_selected:
+            # Delaying the draw_polygon() to prevent the start point from being added twice
+            self.master.after(100, lambda: self.canvas.bind("<B1-Motion>", self.draw_polygon))
+            self.canvas.bind("<ButtonRelease-1>", self.finish_polygon)
+
+    def draw_polygon(self, event):
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        self.area.append((x, y))
+
+        if 'polygon_item' in self.__dict__:
+            self.canvas.delete(self.polygon_item)
+
+        self.polygon_item = self.canvas.create_polygon(self.area, outline="purple", fill='', width=4)
+
+    def finish_polygon(self, event):
+
+        if len(self.area) % 2 == 0:
+            self.area.append(self.area[0])
+
+        self.canvas.delete(self.polygon_item)
+        self.polygon_item = self.canvas.create_polygon(self.area, outline="purple", fill='', width=4)
+        self.canvas.unbind("<B1-Motion>")
+        self.canvas.unbind("<ButtonRelease-1>")
+        self.master.bind("<Return>", self.complete_selection)
+
     def complete_selection(self, event):
-        if self.start_point_selected and self.finish_point_selected:
-            self.master.quit()
+        self.canvas.unbind("<B1-Motion>")
+        self.master.unbind("<Return>")
+        self.master.destroy()
 
 
-def crop_map_around_points(map_image, raw_start_point, raw_end_point, buffer_size=100):
+def crop_map_around_points(map_image, raw_start_point, raw_end_point, area):
     # Extract coordinates
     start_x, start_y = raw_start_point
     end_x, end_y = raw_end_point
 
     map_width, map_height = map_image.size
 
+    # Taking min max coords of the selected area
+    x_coords, y_coords = zip(*area)
+
+    min_x_selected = int(min(x_coords))
+    max_x_selected = int(max(x_coords))
+    min_y_selected = int(min(y_coords))
+    max_y_selected = int(max(y_coords))
+
+
     # Determine the bounding box for cropping
-    min_x = max(0, min(start_x, end_x) - buffer_size)
-    max_x = min(map_width, max(start_x, end_x) + buffer_size)
-    min_y = max(0, min(start_y, end_y) - buffer_size)
-    max_y = min(map_height, max(start_y, end_y) + buffer_size)
+    min_x = max(0, min_x_selected)
+    max_x = min(map_width, max_x_selected)
+    min_y = max(0, min_y_selected)
+    max_y = min(map_height,max_y_selected)
 
     cropped_image = map_image.crop((min_x, min_y, max_x, max_y))
 
-    # Update the adjusted start and end points
+    # Recalibrating start and end points
     start_point = (start_x - min_x, start_y - min_y)
     end_point = (end_x - min_x, end_y - min_y)
 
@@ -172,14 +206,14 @@ def process_image(cropped_image):
 
     for y in range(height):
         progress = int((y / height) * 100)
-        print(f"     Processing image ({width}x{height} pixels): {round(progress,1)}%", end='\r')
+        print(f"    Processing image ({width}x{height} pixels): {round(progress,1)}%", end='\r')
     
         for x in range(width):
             pixel = map_image_np[y, x]
             closest_color = find_closest_color(pixel)
             terrain_grid[x, y] = list(main_colors.keys())[list(main_colors.values()).index(closest_color)]
     
-    print(f"     Processing image ({width}x{height} pixels): {round((time.time() - process_time()), 3)}", end='\r')
+    print(f"    Processing image ({width}x{height} pixels): {round((time.time() - process_time), 3)}s", end='\r')
 
     # Step 2: Check for black horizon lines and change them to brown
     black_id = 9
@@ -209,7 +243,7 @@ def process_image(cropped_image):
                         nx, ny = x + dx, y + dy
                         if 0 <= nx < width and 0 <= ny < height and terrain_grid[nx, ny] != blue_id and terrain_grid[nx, ny] == black_id:
                             terrain_grid[nx, ny] = blue_id
-    print(f"\n     Removing lake and river borders: {round((time.time() - lakes_time), 3)}s")
+    print(f"\n    Removing lake and river borders: {round((time.time() - lakes_time), 3)}s")
 
     # Step 4: Black pixel classification - connecting roads and trails
 
@@ -261,7 +295,7 @@ def process_image(cropped_image):
                             if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
                                 terrain_grid_final[px, py] = black_id
 
-    print(f"     Connecting trails and paths: {round((time.time() - trails_time), 3)}s")
+    print(f"    Connecting trails and paths: {round((time.time() - trails_time), 3)}s")
     return terrain_grid_final
 
 
@@ -288,7 +322,7 @@ def calculate_terrain_costs(terrain_colors):
             color_name = main_colors[terrain_colors[i, j]]
             terrain_costs[i, j] = color_costs[color_name]
 
-    print(f"                    *\n     Map converted into cost array: {round((time.time() - terrain_time), 3)}s")
+    print(f"                    *\n    Map converted into cost array: {round((time.time() - terrain_time), 3)}s")
     return terrain_costs
 
 
@@ -338,7 +372,7 @@ def calculate_lowest_cost_path(terrain_costs, start_point, end_point):
 
     cost = dp[end_point]
 
-    print(f"     Finding the optimal route: {round((time.time() - route_time), 3)} s")
+    print(f"    Finding the optimal route: {round((time.time() - route_time), 3)} s")
 
     return path[::-1], cost
 
@@ -349,8 +383,7 @@ def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
-        
-        final_time = time.time()
+    
 
         root = tk.Tk()
         app = PointSelectionApp(root, map_image)
@@ -360,9 +393,9 @@ def main():
         raw_start_point = (int(app.points[0][0]), int(app.points[0][1]))
         raw_end_point = (int(app.points[1][0]), int(app.points[1][1]))
 
+        final_time = time.time()
         # Crop the map around the points
-        cropped_image, start_point, end_point = crop_map_around_points(map_image, raw_start_point, raw_end_point)
-
+        cropped_image, start_point, end_point = crop_map_around_points(map_image, raw_start_point, raw_end_point, app.area)
 
         # Process image
         terrain_colors = process_image(cropped_image)
@@ -371,12 +404,12 @@ def main():
         # Calculate the lowest cost path
         path, cost = calculate_lowest_cost_path(terrain_costs, start_point, end_point)
 
-        print(f"\n     DONE! Total time: {round((time.time() - final_time), 3)}s")
+        print(f"                    *\n    DONE! Total time: {round((time.time() - final_time), 3)}s")
 
         # Plot the cropped map with the lowest cost path
         plt.figure()
         plt.imshow(cropped_image)
-        plt.plot(*zip(*path), color='red', linewidth=2, linestyle='dotted', dashes=(2,))  # Plot the path
+        plt.plot(*zip(*path), color='red', linewidth=3, linestyle='dotted', dashes=(2,))  # Plot the path
         plt.scatter(start_point[0], start_point[1], edgecolors='red', linewidths=2, s=100, marker='o') 
         plt.scatter(end_point[0], end_point[1], edgecolors='blue', linewidths=2, s=100, marker='o')  
         plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color = "magenta", linewidth=1)  # Plot the connection
