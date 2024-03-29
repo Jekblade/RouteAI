@@ -209,6 +209,58 @@ def coonnect_trails(raw_terrain_grid):
     print(f"Connecting roads: {round((time.time() - seconds), 3)} s")
     return raw_terrain_grid
 
+ # Step 4: Black pixel classification - connecting roads and trails
+def connect_trails_manually(terrain_grid):
+    terrain_grid_final = np.copy(terrain_grid)
+    trails_time = time.time()
+
+    for y in range(0, height):
+        for x in range(0, width):
+            if terrain_grid[x, y] == black_id:
+                max_connectivity = 0
+                best_direction = (0, 0)
+                
+                # Analyze the 5x5 grid around the black pixel
+                for dx in range(-2, 3):
+                    for dy in range(-2, 3):
+                        # Skip the current pixel
+                        if dx == 0 and dy == 0:
+                            continue
+
+                        # Count connectivity in the current direction
+                        connectivity = 0
+                        for i in range(-1, 2):  # Check one more pixel in each direction
+                            px, py = x + i * dx, y + i * dy
+                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] == black_id:
+                                connectivity += 1
+
+                        if connectivity > max_connectivity:
+                            max_connectivity = connectivity
+                            best_direction = (dx, dy)
+
+                # Mark pixels based on the best direction
+                if best_direction[0] == 0 or best_direction[1] == 0:  # Horizontal or vertical direction
+                    for i in range(-2, 3):
+                        for j in range(-2, 3):
+                            px, py = x + i * best_direction[0], y + j * best_direction[1]
+                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
+                                terrain_grid_final[px, py] = black_id
+                else:  # Diagonal direction
+                    for i in range(-1, 2):
+                        for j in range(-1, 2):
+                            # Skip marking the corners based on the best diagonal direction
+                            if (i * best_direction[0] == -1 and j * best_direction[1] == -1) or \
+                            (i * best_direction[0] == -1 and j * best_direction[1] == 1) or \
+                            (i * best_direction[0] == 1 and j * best_direction[1] == -1) or \
+                            (i * best_direction[0] == 1 and j * best_direction[1] == 1):
+                                continue
+
+                            px, py = x + i, y + j
+                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
+                                terrain_grid_final[px, py] = black_id
+
+    print(f"    Connecting trails and paths: {round((time.time() - trails_time), 3)}s")
+
 
 # -=-=-=-=-=-=-=-=-=-
 # Step 3: Artificial LIDAR terrain mapping

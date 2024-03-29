@@ -7,9 +7,78 @@ from tkinter.simpledialog import Dialog
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 import time
-import os
+
+main_colors = {
+    0: "white",
+    1: "yellow",
+    2: "orange",
+    3: "light_green",
+    4: "green",
+    5: "dark_green",
+    6: "light_blue",
+    7: "blue",
+    8: "olive",
+    9: "black",
+    10: "brown1",
+    11: "brown2",
+    12: "brown3",
+    13: "purple1",
+    14: "purple2",
+    15: "pink1",
+    16: "pink2",
+    17: "red"
+}
+
+# RGB values for main colors
+main_color_values = {
+    "white": (255, 255, 255),
+    "yellow": (250, 190, 75),
+    "orange": (253, 217, 148),
+    "light_green": (196, 230, 190),
+    "green": (140, 205, 130),
+    "dark_green": (40, 170, 80),
+    "light_blue": (120, 220, 230),
+    "blue": (0, 160, 215),
+    "olive": (160, 158, 58),
+    "black": (40, 40, 40),
+    "brown1": (190, 105, 40),
+    "brown2": (180, 172, 112),
+    "brown3": (130, 140, 75),
+    "purple1": (136, 0, 160),
+    "purple2": (150, 70, 140),
+    "pink1": (215, 0, 120),
+    "pink2": (195, 31, 255),
+    "red": (135, 10, 50)
+}
+
+# Costs associated with terrain runnability
+color_costs = {
+    "white": 1.6, 
+    "yellow": 1.2,
+    "orange": 1.4,
+    "light_green": 3,
+    "green": 4.5,
+    "dark_green": 6,
+    "light_blue": 5,
+    "blue": 5,
+    "olive": 100,
+    "black": 1.3,
+    "brown1": 20,
+    "brown2": 20,
+    "brown3": 20,
+    "purple1": 20,
+    "purple2": 20,
+    "pink1": 20,
+    "pink2": 20,
+    "red": 20
+}
 
 class ModeSelectionDialog(Dialog):
+    def __init__(self, master):
+        self.map_type = None
+        self.contours = None
+        super().__init__(master)
+
     def body(self, master):
         self.title("Map type")
         self.geometry("300x200")
@@ -25,21 +94,48 @@ class ModeSelectionDialog(Dialog):
         return None  
 
     def buttonbox(self):
-        # Remove default buttons
         box = tk.Frame(self)
 
-        # Add custom buttons
-        tk.Button(box, text="Forest", command=lambda: self.done("Forest")).pack(side=tk.LEFT, padx=5, pady=5)
-        tk.Button(box, text="Sprint", command=lambda: self.done("Sprint")).pack(side=tk.LEFT, padx=5, pady=5)
+        forest_button = tk.Button(box, text="Forest", command=lambda: self.set_map_type("Forest"))
+        sprint_button = tk.Button(box, text="Sprint", command=lambda: self.set_map_type("Sprint"))
+        self.map_type_buttons = [forest_button, sprint_button]
+        forest_button.pack(side=tk.LEFT, padx=5, pady=5)
+        sprint_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        self.bind("<Return>", lambda event: self.done("Forest"))
-        self.bind("<Escape>", lambda event: self.done("Sprint"))
+        contours_box = tk.Frame(self)
+        m25_button = tk.Button(contours_box, text="2.5m", command=lambda: self.set_contours("2.5m"))
+        m5_button = tk.Button(contours_box, text="5m", command=lambda: self.set_contours("5m"))
+        self.contours_buttons = [m25_button, m5_button]
+        m25_button.pack(side=tk.LEFT, padx=5, pady=5)
+        m5_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+        continue_box = tk.Frame(self)
+        tk.Button(continue_box, text="Continue", command=self.done).pack(side=tk.LEFT, padx=5, pady=5)
 
         box.pack()
+        contours_box.pack()
+        continue_box.pack()
 
-    def done(self, result):
-        self.result = result
-        self.destroy()
+    def set_map_type(self, map_type):
+        self.map_type = map_type
+        for button in self.map_type_buttons:
+            if button.cget("text") == map_type:
+                button.config(bg="green")
+            else:
+                button.config(bg="SystemButtonFace")
+
+    def set_contours(self, contours):
+        self.contours = contours
+        for button in self.contours_buttons:
+            if button.cget("text") == contours:
+                button.config(bg="green")
+            else:
+                button.config(bg="SystemButtonFace")
+
+    def done(self):
+        self.result = (self.map_type, self.contours)
+        self.master.destroy()
+
 
 class PointSelectionApp:
     def __init__(self, master, map_image):
@@ -92,12 +188,25 @@ class PointSelectionApp:
                 finish_point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline="blue", width=2, fill='')
                 self.points.append((x, y, finish_point_item))
                 self.finish_point_selected = True
+                
 
     def select_area(self, event):
         if self.finish_point_selected:
+            self.text_item = self.canvas.create_text(event.x, event.y, text="Select an analysis area", fill="black", font=("Arial", 20))
+
             # Delaying the draw_polygon() to prevent the start point from being added twice
             self.master.after(100, lambda: self.canvas.bind("<B1-Motion>", self.draw_polygon))
             self.canvas.bind("<ButtonRelease-1>", self.finish_polygon)
+            self.canvas.bind("<Motion>", self.move_text)
+            self.canvas.bind("<Button-1>", self.remove_text)
+
+    def remove_text(self, event):
+        self.canvas.delete(self.text_item)
+
+    def move_text(self, event):
+        if self.finish_point_selected:
+            self.canvas.coords(self.text_item, event.x +120, event.y + 20)
+
 
     def draw_polygon(self, event):
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
@@ -106,7 +215,7 @@ class PointSelectionApp:
         if 'polygon_item' in self.__dict__:
             self.canvas.delete(self.polygon_item)
 
-        self.polygon_item = self.canvas.create_polygon(self.area, outline="purple", fill='', width=4)
+        self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=3)
 
     def finish_polygon(self, event):
 
@@ -114,7 +223,7 @@ class PointSelectionApp:
             self.area.append(self.area[0])
 
         self.canvas.delete(self.polygon_item)
-        self.polygon_item = self.canvas.create_polygon(self.area, outline="purple", fill='', width=4)
+        self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=4)
         self.canvas.unbind("<B1-Motion>")
         self.canvas.unbind("<ButtonRelease-1>")
         self.master.bind("<Return>", self.complete_selection)
@@ -157,7 +266,7 @@ def crop_map_around_points(map_image, raw_start_point, raw_end_point, area):
 
 
 # IMAGE PROCESSING
-def process_image(cropped_image, main_colors, main_color_values, color_tree):
+def process_image(cropped_image, main_colors, main_color_values, color_tree, map_type):
     
     process_time = time.time()
     progress = 0
@@ -208,59 +317,7 @@ def process_image(cropped_image, main_colors, main_color_values, color_tree):
                         if 0 <= nx < width and 0 <= ny < height and terrain_grid[nx, ny] != blue_id and terrain_grid[nx, ny] == black_id:
                             terrain_grid[nx, ny] = blue_id
     print(f"\n    Removing lake and river borders: {round((time.time() - lakes_time), 3)}s")
-
-    # Step 4: Black pixel classification - connecting roads and trails
-
-    terrain_grid_final = np.copy(terrain_grid)
-    trails_time = time.time()
-
-    for y in range(0, height):
-        for x in range(0, width):
-            if terrain_grid[x, y] == black_id:
-                max_connectivity = 0
-                best_direction = (0, 0)
-                
-                # Analyze the 5x5 grid around the black pixel
-                for dx in range(-2, 3):
-                    for dy in range(-2, 3):
-                        # Skip the current pixel
-                        if dx == 0 and dy == 0:
-                            continue
-
-                        # Count connectivity in the current direction
-                        connectivity = 0
-                        for i in range(-1, 2):  # Check one more pixel in each direction
-                            px, py = x + i * dx, y + i * dy
-                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] == black_id:
-                                connectivity += 1
-
-                        if connectivity > max_connectivity:
-                            max_connectivity = connectivity
-                            best_direction = (dx, dy)
-
-                # Mark pixels based on the best direction
-                if best_direction[0] == 0 or best_direction[1] == 0:  # Horizontal or vertical direction
-                    for i in range(-2, 3):
-                        for j in range(-2, 3):
-                            px, py = x + i * best_direction[0], y + j * best_direction[1]
-                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
-                                terrain_grid_final[px, py] = black_id
-                else:  # Diagonal direction
-                    for i in range(-1, 2):
-                        for j in range(-1, 2):
-                            # Skip marking the corners based on the best diagonal direction
-                            if (i * best_direction[0] == -1 and j * best_direction[1] == -1) or \
-                            (i * best_direction[0] == -1 and j * best_direction[1] == 1) or \
-                            (i * best_direction[0] == 1 and j * best_direction[1] == -1) or \
-                            (i * best_direction[0] == 1 and j * best_direction[1] == 1):
-                                continue
-
-                            px, py = x + i, y + j
-                            if 0 <= px < width and 0 <= py < height and terrain_grid[px, py] != black_id:
-                                terrain_grid_final[px, py] = black_id
-
-    print(f"    Connecting trails and paths: {round((time.time() - trails_time), 3)}s")
-    return terrain_grid_final
+    return terrain_grid
 
 
 
@@ -345,152 +402,41 @@ def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
-
+        root = tk.Tk()
 
         # Choosing forest or sprint map
-        root = tk.Tk()
-        choice = ModeSelectionDialog(root).result
+        dialog = ModeSelectionDialog(root)
 
-        if choice == 'Forest':
+        map_type = dialog.map_type
+        contours = dialog.contours
 
-            main_colors = {
-                0: "white",
-                1: "yellow",
-                2: "orange",
-                3: "light_green",
-                4: "green",
-                5: "dark_green",
-                6: "light_blue",
-                7: "blue",
-                8: "olive",
-                9: "black",
-                10: "brown1",
-                11: "brown2",
-                12: "brown3",
-                13: "purple1",
-                14: "purple2",
-                15: "pink1",
-                16: "pink2",
-                17: "red"
-            }
+        if map_type == 'Forest':
+            pass
 
-            # RGB values for main colors
-            main_color_values = {
-                "white": (255, 255, 255),
-                "yellow": (250, 190, 75),
-                "orange": (253, 217, 148),
-                "light_green": (196, 230, 190),
-                "green": (140, 205, 130),
-                "dark_green": (40, 170, 80),
-                "light_blue": (120, 220, 230),
-                "blue": (0, 160, 215),
-                "olive": (160, 158, 58),
-                "black": (40, 40, 40),
-                "brown1": (190, 105, 40),
-                "brown2": (180, 172, 112),
-                "brown3": (130, 140, 75),
-                "purple1": (136, 0, 160),
-                "purple2": (150, 70, 140),
-                "pink1": (215, 0, 120),
-                "pink2": (195, 31, 255),
-                "red": (135, 10, 50)
-            }
+        elif map_type == 'Sprint':
+            main_colors[18] = "gray"
+            main_colors[19] = "road_orange"
 
-            # Costs associated with terrain runnability
-            color_costs = {
-                "white": 1.6, 
-                "yellow": 1.2,
-                "orange": 1.4,
-                "light_green": 3,
-                "green": 4.5,
-                "dark_green": 6,
-                "light_blue": 5,
-                "blue": 5,
-                "olive": 100,
-                "black": 1,
-                "brown1": 30,
-                "brown2": 30,
-                "brown3": 30,
-                "purple1": 50,
-                "purple2": 50,
-                "pink1": 50,
-                "pink2": 50,
-                "red": 50
-            }
+            main_color_values["gray"] = (138, 138, 138)
+            main_color_values["road_orange"] = (225, 195, 165)
 
-        elif choice == 'Sprint':
+            del color_costs["black"]
+            color_costs["black"] = 100 # Impassable
+            color_costs["road_orange"] = 1.1
+            color_costs["gray"] = 100 # Impassable
 
-            main_colors = {
-                0: "white",
-                1: "yellow",
-                2: "orange",
-                3: "light_green",
-                4: "green",
-                5: "dark_green",
-                6: "light_blue",
-                7: "blue",
-                8: "olive",
-                9: "black",
-                10: "brown1",
-                11: "brown2",
-                12: "brown3",
-                13: "purple1",
-                14: "purple2",
-                15: "pink1",
-                16: "pink2",
-                17: "red",
-                18: "gray",
-                19: "road_orange"
-            }
+        if contours == '2.5m':
+            keys = ["brown1", "brown2", "brown3", "pink1", "pink2", "purple1", "purple2", "red"]
 
-            main_color_values = {
-                "white": (255, 255, 255),
-                "yellow": (250, 190, 75),
-                "orange": (253, 217, 148),
-                "light_green": (196, 230, 190),
-                "green": (140, 205, 130),
-                "dark_green": (40, 170, 80),
-                "light_blue": (120, 220, 230),
-                "blue": (0, 160, 215),
-                "olive": (160, 158, 58),
-                "black": (40, 40, 40),
-                "brown1": (190, 105, 40),
-                "brown2": (180, 172, 112),
-                "brown3": (130, 140, 75),
-                "purple1": (136, 0, 160),
-                "purple2": (150, 70, 140),
-                "pink1": (215, 0, 120),
-                "pink2": (195, 31, 255),
-                "red": (135, 10, 50),
-                "gray": (138, 138, 138),
-                "road_orange": (225, 195, 165)
-            }
+            for key in keys:
+                color_costs[key] = 10
 
-            # Costs associated with terrain runnability
-            color_costs = {
-                "white": 1.6, 
-                "yellow": 1.2,
-                "orange": 1.4,
-                "light_green": 3,
-                "green": 4.5,
-                "dark_green": 6,
-                "light_blue": 5,
-                "blue": 5,
-                "olive": 100,
-                "black": 100,
-                "gray": 100,
-                "road_orange": 1.1,
-                "brown1": 30,
-                "brown2": 30,
-                "brown3": 30,
-                "purple1": 50,
-                "purple2": 50,
-                "pink1": 50,
-                "pink2": 50,
-                "red": 50
-            }
+        elif contours == '5m':
+            pass
+        
 
         # Create the GUI for selecting the start and end points
+        root = tk.Tk()
         app = PointSelectionApp(root, map_image)
         root.mainloop()
 
@@ -507,7 +453,7 @@ def main():
 
         color_tree = KDTree(list(main_color_values.values()))   # Create a k-d tree for the main colors to match the closest
 
-        terrain_colors = process_image(cropped_image, main_colors, main_color_values, color_tree)
+        terrain_colors = process_image(cropped_image, main_colors, main_color_values, color_tree, map_type)
         terrain_costs = calculate_terrain_costs(terrain_colors, color_costs, main_colors)
 
         # Calculate the lowest cost path
