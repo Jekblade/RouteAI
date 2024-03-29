@@ -40,8 +40,7 @@ class HoverButton(tk.Button):
 
 #Buttons
 def route_ai():
-    hide_main_buttons()
-    show_route_ai_ui()
+    os.system("python3 RouteAI/LeastCostPath.py")
 
 def map_convert():
     os.system('python3 MapConvert/mapConvert.py')

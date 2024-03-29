@@ -319,3 +319,31 @@ def trails_paths(raw_terrain_grid):
     paths = thickest_parts | distance | skeleton
     
     return paths
+
+raw_start_point = (int(app.points[0][0]), int(app.points[0][1]))
+            raw_end_point = (int(app.points[1][0]), int(app.points[1][1]))
+
+            final_time = time.time()
+
+            # Crop the map around the points
+            cropped_image, start_point, end_point = crop_map_around_points(map_image, raw_start_point, raw_end_point, app.area)
+
+            # -=-=-=- Process image -=-=-=-=-
+
+            color_tree = KDTree(list(main_color_values.values()))   # Create a k-d tree for the main colors to match the closest
+
+            terrain_colors = process_image(cropped_image, main_colors, main_color_values, color_tree)
+            terrain_costs = calculate_terrain_costs(terrain_colors, color_costs, main_colors)
+
+            # Calculate the lowest cost path
+            path, cost = calculate_lowest_cost_path(terrain_costs, start_point, end_point)
+
+            print(f"                    *\n    DONE! Total time: {round((time.time() - final_time), 3)}s")
+
+            # Convert the cropped image to a PhotoImage and display it on the canvas
+            cropped_photo = ImageTk.PhotoImage(cropped_image)
+            image_window.canvas.create_image(0, 0, anchor=tk.NW, image=cropped_photo)
+
+            # Draw the optimal route on the canvas
+            for i in range(len(path) - 1):
+                image_window.canvas.create_line(path[i][0], path[i][1], path[i+1][0], path[i+1][1], fill='red', width=3)

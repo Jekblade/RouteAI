@@ -7,6 +7,7 @@ from tkinter.simpledialog import Dialog
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 import time
+import math
 
 main_colors = {
     0: "white",
@@ -73,165 +74,6 @@ color_costs = {
     "red": 20
 }
 
-class ModeSelectionDialog(Dialog):
-    def __init__(self, master):
-        self.map_type = None
-        self.contours = None
-        super().__init__(master)
-
-    def body(self, master):
-        self.title("Map type")
-        self.geometry("300x200")
-
-        # Calculate position for center of screen
-        window_width = self.winfo_reqwidth()
-        window_height = self.winfo_reqheight()
-        position_right = int(self.winfo_screenwidth()/2 - window_width/2)
-        position_down = int(self.winfo_screenheight()/2 - window_height/2)
-        self.geometry("+{}+{}".format(position_right, position_down))
-
-        tk.Label(master, text="Choose orienteering map type").pack()
-        return None  
-
-    def buttonbox(self):
-        box = tk.Frame(self)
-
-        forest_button = tk.Button(box, text="Forest", command=lambda: self.set_map_type("Forest"))
-        sprint_button = tk.Button(box, text="Sprint", command=lambda: self.set_map_type("Sprint"))
-        self.map_type_buttons = [forest_button, sprint_button]
-        forest_button.pack(side=tk.LEFT, padx=5, pady=5)
-        sprint_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        contours_box = tk.Frame(self)
-        m25_button = tk.Button(contours_box, text="2.5m", command=lambda: self.set_contours("2.5m"))
-        m5_button = tk.Button(contours_box, text="5m", command=lambda: self.set_contours("5m"))
-        self.contours_buttons = [m25_button, m5_button]
-        m25_button.pack(side=tk.LEFT, padx=5, pady=5)
-        m5_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        continue_box = tk.Frame(self)
-        tk.Button(continue_box, text="Continue", command=self.done).pack(side=tk.LEFT, padx=5, pady=5)
-
-        box.pack()
-        contours_box.pack()
-        continue_box.pack()
-
-    def set_map_type(self, map_type):
-        self.map_type = map_type
-        for button in self.map_type_buttons:
-            if button.cget("text") == map_type:
-                button.config(bg="green")
-            else:
-                button.config(bg="SystemButtonFace")
-
-    def set_contours(self, contours):
-        self.contours = contours
-        for button in self.contours_buttons:
-            if button.cget("text") == contours:
-                button.config(bg="green")
-            else:
-                button.config(bg="SystemButtonFace")
-
-    def done(self):
-        self.result = (self.map_type, self.contours)
-        self.master.destroy()
-
-
-class PointSelectionApp:
-    def __init__(self, master, map_image):
-           
-        self.master = master
-        self.master.title("Selection of start point and end point")
-
-        self.points = []
-        self.area = []
-        self.start_point_selected = False
-        self.finish_point_selected = False
-
-        self.canvas = tk.Canvas(master)
-        self.canvas.pack(side="left", fill="y")
-
-        #Scrollbars
-        self.v_scrollbar = tk.Scrollbar(master, orient="vertical", command=self.canvas.yview)
-        self.v_scrollbar.pack(side="right", fill="y")
-        self.canvas.configure(yscrollcommand=self.v_scrollbar.set)
-
-        self.map_photo = ImageTk.PhotoImage(map_image)
-        self.image_item = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.map_photo)
-        canvas_width = self.map_photo.width()
-        canvas_height = self.map_photo.height()
-        self.canvas.config(width=canvas_width, height=canvas_height)
-
-        self.canvas.update_idletasks()
-        self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
-
-        # Actions
-        self.canvas.bind("<Button-1>", self.add_point)
-        self.master.bind("<Return>", self.select_area)
-
-
-    def add_point(self, event):
-        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-
-        if len(self.points) <= 2:
-           
-            if not self.start_point_selected:
-
-                # Draw the start point
-                start_point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline="red", width=2, fill='')
-                self.points.append((x, y, start_point_item))
-                self.start_point_selected = True
-
-            # Do the same for the finish point
-            elif self.start_point_selected and not self.finish_point_selected:
-
-                finish_point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline="blue", width=2, fill='')
-                self.points.append((x, y, finish_point_item))
-                self.finish_point_selected = True
-                
-
-    def select_area(self, event):
-        if self.finish_point_selected:
-            self.text_item = self.canvas.create_text(event.x, event.y, text="Select an analysis area", fill="black", font=("Arial", 20))
-
-            # Delaying the draw_polygon() to prevent the start point from being added twice
-            self.master.after(100, lambda: self.canvas.bind("<B1-Motion>", self.draw_polygon))
-            self.canvas.bind("<ButtonRelease-1>", self.finish_polygon)
-            self.canvas.bind("<Motion>", self.move_text)
-            self.canvas.bind("<Button-1>", self.remove_text)
-
-    def remove_text(self, event):
-        self.canvas.delete(self.text_item)
-
-    def move_text(self, event):
-        if self.finish_point_selected:
-            self.canvas.coords(self.text_item, event.x +120, event.y + 20)
-
-
-    def draw_polygon(self, event):
-        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        self.area.append((x, y))
-
-        if 'polygon_item' in self.__dict__:
-            self.canvas.delete(self.polygon_item)
-
-        self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=3)
-
-    def finish_polygon(self, event):
-
-        if len(self.area) % 2 == 0:
-            self.area.append(self.area[0])
-
-        self.canvas.delete(self.polygon_item)
-        self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=4)
-        self.canvas.unbind("<B1-Motion>")
-        self.canvas.unbind("<ButtonRelease-1>")
-        self.master.bind("<Return>", self.complete_selection)
-
-    def complete_selection(self, event):
-        self.canvas.unbind("<B1-Motion>")
-        self.master.unbind("<Return>")
-        self.master.destroy()
 
 
 def crop_map_around_points(map_image, raw_start_point, raw_end_point, area):
@@ -266,7 +108,7 @@ def crop_map_around_points(map_image, raw_start_point, raw_end_point, area):
 
 
 # IMAGE PROCESSING
-def process_image(cropped_image, main_colors, main_color_values, color_tree, map_type):
+def process_image(cropped_image, main_colors, main_color_values, color_tree):
     
     process_time = time.time()
     progress = 0
@@ -396,80 +238,236 @@ def calculate_lowest_cost_path(terrain_costs, start_point, end_point):
     return path[::-1], cost
 
 
+class RouteAI:
+    def __init__(self, master, map_image):
+
+        self.master = master
+        self.master.title("Selection of start point and end point")
+
+        self.canvas = tk.Canvas(master)
+        self.canvas.pack(side="left", fill="y")
+
+        # Scrollbars
+        self.v_scrollbar = tk.Scrollbar(master, orient="vertical", command=self.canvas.yview)
+        self.v_scrollbar.pack(side="right", fill="y")
+        self.canvas.configure(yscrollcommand=self.v_scrollbar.set)
+
+        self.map_image = map_image
+        self.map_photo = ImageTk.PhotoImage(map_image)
+        self.image_item = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.map_photo)
+        canvas_width = self.map_photo.width()
+        canvas_height = self.map_photo.height()
+        self.canvas.config(width=canvas_width, height=canvas_height)
+
+        self.map_type = tk.StringVar()
+        self.map_type.set("Forest")  # Default selection
+        self.contours = tk.StringVar()
+        self.contours.set("2.5m")  # Default selection
+
+        button_frame = tk.Frame(master)
+        button_frame.pack(side=tk.RIGHT, padx=10, pady=10)
+
+        tk.Label(button_frame, text="Map Type:").grid(row=0, column=0, columnspan=2)
+        tk.Radiobutton(button_frame, text="Forest", variable=self.map_type, value="Forest").grid(row=1, column=0)
+        tk.Radiobutton(button_frame, text="Sprint", variable=self.map_type, value="Sprint").grid(row=1, column=1)
+
+        tk.Label(button_frame, text="").grid(row=2, column=0)
+
+        tk.Label(button_frame, text="Contours:").grid(row=3, column=0, columnspan=2)
+        tk.Radiobutton(button_frame, text="2.5m", variable=self.contours, value="2.5m").grid(row=4, column=0)
+        tk.Radiobutton(button_frame, text="5m", variable=self.contours, value="5m").grid(row=4, column=1)
+
+        for i in range(5, 6):
+            tk.Label(button_frame, text="").grid(row=i, column=0)
+
+        self.another_route_button = tk.Button(button_frame, text="Create a new route", command=self.another_route)
+        self.another_route_button.grid(row=7, column=0, columnspan=2)
+
+        # Add StringVars for the progress, optimal route cost, and approximated time
+        self.progress = tk.StringVar()
+        self.progress.set("Progress: 0%")
+        self.optimal_route_cost = tk.StringVar()
+        self.optimal_route_cost.set("Optimal route cost: N/A")
+        self.approximated_time = tk.StringVar()
+        self.approximated_time.set("Approximated time: N/A")
+
+        # Add labels for the progress, optimal route cost, and approximated time
+        tk.Label(button_frame, textvariable=self.progress).grid(row=8, column=0, columnspan=2)
+        tk.Label(button_frame, textvariable=self.optimal_route_cost).grid(row=9, column=0, columnspan=2)
+        tk.Label(button_frame, textvariable=self.approximated_time).grid(row=10, column=0, columnspan=2)
+
+
+        self.points = []
+        self.area = []
+        self.start_point_selected = False
+        self.finish_point_selected = False
+        self.canvas.bind("<Button-1>", self.add_point)
+
+
+
+    def another_route(self):
+        self.canvas.delete("all")
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.map_photo)
+
+        self.points = []
+        self.area = []
+        self.start_point_selected = False
+        self.finish_point_selected = False
+
+        self.canvas.bind("<Button-1>", self.add_point)
+
+
+    def add_point(self, event):
+        
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+
+        if len(self.points) <= 2:
+            if not self.start_point_selected:
+                # Draw the start point
+                start_point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline="red", width=2, fill='')
+                self.points.append((x, y, start_point_item))
+                self.start_point_selected = True
+
+            # Do the same for the finish point
+            elif self.start_point_selected and not self.finish_point_selected:
+                finish_point_item = self.canvas.create_oval(x - 10, y - 10, x + 10, y + 10, outline="blue", width=2, fill='')
+                self.points.append((x, y, finish_point_item))
+                self.finish_point_selected = True
+                self.select_area(event)
+
+    def select_area(self, event):
+        if self.finish_point_selected:
+            self.text_item = self.canvas.create_text(event.x, event.y, text="Select an analysis area", fill="black", font=("Arial", 20))
+
+            # Delaying the draw_polygon() to prevent the start point from being added twice
+            self.master.after(100, lambda: self.canvas.bind("<B1-Motion>", self.draw_polygon))
+            self.canvas.bind("<ButtonRelease-1>", self.finish_polygon)
+            self.canvas.bind("<Motion>", self.move_text)
+            self.canvas.bind("<Button-1>", self.remove_text)
+
+    def remove_text(self, event):
+        self.canvas.delete(self.text_item)
+
+    def move_text(self, event):
+        if self.finish_point_selected:
+            self.canvas.coords(self.text_item, event.x + 120, event.y + 20)
+
+    def draw_polygon(self, event):
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        self.area.append((x, y))
+
+        if 'polygon_item' in self.__dict__:
+            self.canvas.delete(self.polygon_item)
+
+        self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=3)
+
+
+    def finish_polygon(self, event):
+        if len(self.area) % 2 == 0:
+            self.area.append(self.area[0])
+
+        self.canvas.delete(self.polygon_item)
+        self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=3)
+        self.canvas.unbind("<B1-Motion>")
+        self.canvas.unbind("<ButtonRelease-1>")
+        self.canvas.unbind("<Motion>")
+        self.canvas.unbind("<Button-1>")
+
+        self.complete_selection(self.area)
+
+
+    def complete_selection(self, area):
+        final_time = time.time()
+        raw_start_point = (int(self.points[0][0]), int(self.points[0][1]))
+        raw_end_point = (int(self.points[1][0]), int(self.points[1][1]))
+
+        self.map_type = self.map_type.get()
+        if self.map_type == 'Forest':
+            pass
+
+        elif self.map_type == 'Sprint':
+            main_colors[18] = "gray"
+            main_colors[19] = "road_orange"
+            main_color_values["gray"] = (138, 138, 138)
+            main_color_values["road_orange"] = (225, 195, 165)
+            del color_costs["black"]
+            color_costs["black"] = 100 # Impassable
+            color_costs["road_orange"] = 1.1
+            color_costs["gray"] = 100 # Impassable
+
+        self.contours = self.contours.get()
+        if self.contours == '5m':
+            pass
+
+        elif self.contours == '2.5m':
+            del color_costs["black"]
+            color_costs["black"] = 100 # Impassable
+            color_costs["road_orange"] = 1.1
+            color_costs["gray"] = 100 # Impassable
+
+            keys = ["brown1", "brown2", "brown3"]
+            for key in keys:
+                color_costs[key] = 10
+            
+            keys = ["purple1", "purple2", "pink1", "pink2", "red"]
+            for key in keys:
+                color_costs[key] = 50
+
+
+
+        cropped_image, start_point, end_point = crop_map_around_points(self.map_image, raw_start_point, raw_end_point, area)
+
+        color_tree = KDTree(list(main_color_values.values()))   # Create a k-d tree for the main colors to match the closest
+
+        terrain_colors = process_image(cropped_image, main_colors, main_color_values, color_tree)
+
+        # Calculate terrain costs
+        terrain_costs = calculate_terrain_costs(terrain_colors, color_costs, main_colors)
+
+        path, cost = calculate_lowest_cost_path(terrain_costs, start_point, end_point)
+
+        print(f"                    *\n    DONE! Total time: {round((time.time() - final_time), 3)}s")
+
+        # Convert the cropped image to a PhotoImage and display it on the canvas
+        self.cropped_photo = ImageTk.PhotoImage(cropped_image)
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.cropped_photo)
+
+        # Draw the optimal route on the canvas
+        for i in range(len(path) - 1):
+            self.canvas.create_line(path[i][0], path[i][1], path[i+1][0], path[i+1][1], fill='red', width=3)
+
+        start_point_item = self.canvas.create_oval(start_point[0] - 10, start_point[1] - 10, start_point[0] + 10, start_point[1] + 10, outline="red", width=2, fill='')
+        end_point_item = self.canvas.create_oval(end_point[0] - 10, end_point[1] - 10, end_point[0] + 10, end_point[1] + 10, outline="blue", width=2, fill='')
+
+        # Calculate the direction of the line
+        dx = end_point[0] - start_point[0]
+        dy = end_point[1] - start_point[1]
+        length = math.sqrt(dx**2 + dy**2)
+        dx /= length
+        dy /= length
+
+        # Adjust the start and end points
+        start_point = (start_point[0] + 10 * dx, start_point[1] + 10 * dy)
+        end_point = (end_point[0] - 10 * dx, end_point[1] - 10 * dy)
+
+        # Draw the connection between the adjusted start point and end point
+        connection_item = self.canvas.create_line(start_point[0], start_point[1], end_point[0], end_point[1], fill='green', width=3)
+
+        self.progress.set("Progress: 100%")
+        self.optimal_route_cost.set(f"Optimal route cost: {round(cost, 2)}")
+        self.approximated_time.set(f"Approximated time: {round(cost / 180)}min")
+
+
 
 def main():
     # Select a map file
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
+
         root = tk.Tk()
-
-        # Choosing forest or sprint map
-        dialog = ModeSelectionDialog(root)
-
-        map_type = dialog.map_type
-        contours = dialog.contours
-
-        if map_type == 'Forest':
-            pass
-
-        elif map_type == 'Sprint':
-            main_colors[18] = "gray"
-            main_colors[19] = "road_orange"
-
-            main_color_values["gray"] = (138, 138, 138)
-            main_color_values["road_orange"] = (225, 195, 165)
-
-            del color_costs["black"]
-            color_costs["black"] = 100 # Impassable
-            color_costs["road_orange"] = 1.1
-            color_costs["gray"] = 100 # Impassable
-
-        if contours == '2.5m':
-            keys = ["brown1", "brown2", "brown3", "pink1", "pink2", "purple1", "purple2", "red"]
-
-            for key in keys:
-                color_costs[key] = 10
-
-        elif contours == '5m':
-            pass
-        
-
-        # Create the GUI for selecting the start and end points
-        root = tk.Tk()
-        app = PointSelectionApp(root, map_image)
+        app = RouteAI(root, map_image)
         root.mainloop()
-
-        raw_start_point = (int(app.points[0][0]), int(app.points[0][1]))
-        raw_end_point = (int(app.points[1][0]), int(app.points[1][1]))
-
-        final_time = time.time()
-
-        # Crop the map around the points
-        cropped_image, start_point, end_point = crop_map_around_points(map_image, raw_start_point, raw_end_point, app.area)
-
-
-        # -=-=-=- Process image -=-=-=-=-
-
-        color_tree = KDTree(list(main_color_values.values()))   # Create a k-d tree for the main colors to match the closest
-
-        terrain_colors = process_image(cropped_image, main_colors, main_color_values, color_tree, map_type)
-        terrain_costs = calculate_terrain_costs(terrain_colors, color_costs, main_colors)
-
-        # Calculate the lowest cost path
-        path, cost = calculate_lowest_cost_path(terrain_costs, start_point, end_point)
-
-        print(f"                    *\n    DONE! Total time: {round((time.time() - final_time), 3)}s")
-
-        # Plot the cropped map with the lowest cost path
-        plt.figure()
-        plt.imshow(cropped_image)
-        plt.plot(*zip(*path), color='red', linewidth=3, linestyle='dotted', dashes=(2,))  # Plot the path
-        plt.scatter(start_point[0], start_point[1], edgecolors='red', linewidths=2, s=100, marker='o') 
-        plt.scatter(end_point[0], end_point[1], edgecolors='blue', linewidths=2, s=100, marker='o')  
-        plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color = "magenta", linewidth=1)  # Plot the connection
-        plt.title(f'Least Cost path: {round(cost,2)} ||| Approximated time: {round(cost/180)}min')
-        plt.show()
 
 if __name__ == "__main__":
     main()
