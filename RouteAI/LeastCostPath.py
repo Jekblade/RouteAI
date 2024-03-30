@@ -130,18 +130,28 @@ def process_image(cropped_image, main_colors, main_color_values, color_tree):
     
     print(f"    Processing image ({width}x{height} pixels): {round((time.time() - process_time), 3)}s", end='\r')
 
-    # Step 2: Check for black horizon lines and change them to brown
+    # Step 2: Check for horizon lines and remove them
     black_id = 9
-    threshold = 0.3
+    blue_id = 7
+    light_blue_id = 6
+    threshold = 0.5
     width, height = terrain_grid.shape
+    columns_to_delete = []
 
     for y in range(height):
         black_pixel_count = np.count_nonzero(terrain_grid[:, y] == black_id)
+        blue_pixel_count = np.count_nonzero(terrain_grid[:, y] == blue_id)
+        light_blue_pixel_count = np.count_nonzero(terrain_grid[:, y] == light_blue_id)
         total_pixels = width
         black_pixel_percentage = black_pixel_count / total_pixels
+        blue_pixel_percentage = blue_pixel_count / total_pixels
+        light_blue_pixel_percentage = light_blue_pixel_count / total_pixels
 
-        if black_pixel_percentage >= threshold:
-            terrain_grid[:, y][terrain_grid[:, y] == black_id] = 11  # Change black to brown
+        if black_pixel_percentage >= threshold or blue_pixel_percentage >= threshold or light_blue_pixel_percentage >= threshold:
+            columns_to_delete.append(y)
+
+    terrain_grid = np.delete(terrain_grid, y, axis=1)
+    width, height = terrain_grid.shape
 
 
     # Step 3: Expanding lakes and rivers to remove black borders
@@ -149,15 +159,19 @@ def process_image(cropped_image, main_colors, main_color_values, color_tree):
     light_blue_id = 6
     blue_id = 7
     black_id = 9
+    yellow_id = 1
+    orange_id = 2
 
     for y in range(1, height - 1):
         for x in range(1, width - 1):
-            if terrain_grid[x, y] in [light_blue_id, blue_id]:
+            if terrain_grid[x, y] in [light_blue_id, blue_id, yellow_id, orange_id]:
                 for dx in range(-2, 3):
                     for dy in range(-2, 3):
                         nx, ny = x + dx, y + dy
-                        if 0 <= nx < width and 0 <= ny < height and terrain_grid[nx, ny] != blue_id and terrain_grid[nx, ny] == black_id:
-                            terrain_grid[nx, ny] = blue_id
+                        if 0 <= nx < width and 0 <= ny < height and terrain_grid[nx, ny] != blue_id:
+                            if terrain_grid[nx, ny] == black_id or terrain_grid[nx, ny] == yellow_id or terrain_grid[nx, ny] == orange_id:
+                                terrain_grid[nx, ny] = blue_id
+
     print(f"\n    Removing lake and river borders: {round((time.time() - lakes_time), 3)}s")
     return terrain_grid
 
@@ -304,7 +318,6 @@ class RouteAI:
         self.canvas.bind("<Button-1>", self.add_point)
 
 
-
     def another_route(self):
         self.canvas.delete("all")
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.map_photo)
@@ -381,38 +394,52 @@ class RouteAI:
         raw_start_point = (int(self.points[0][0]), int(self.points[0][1]))
         raw_end_point = (int(self.points[1][0]), int(self.points[1][1]))
 
-        self.map_type = self.map_type.get()
-        if self.map_type == 'Forest':
-            pass
-
-        elif self.map_type == 'Sprint':
+        if self.map_type.get() == 'Sprint':
             main_colors[18] = "gray"
             main_colors[19] = "road_orange"
+            main_colors[20] = "passable_gray"
             main_color_values["gray"] = (138, 138, 138)
             main_color_values["road_orange"] = (225, 195, 165)
-            del color_costs["black"]
-            color_costs["black"] = 100 # Impassable
-            color_costs["road_orange"] = 1.1
-            color_costs["gray"] = 100 # Impassable
+            main_color_values["passable_gray"] = (210, 210, 210)
 
-        self.contours = self.contours.get()
-        if self.contours == '5m':
-            pass
+            color_costs.update({
+            "black": 100,  # Impassable
+            "road_orange": 1.1,
+            "gray": 100,  # Impassable
+            "passable_gray": 1.1
+            })
 
-        elif self.contours == '2.5m':
-            del color_costs["black"]
-            color_costs["black"] = 100 # Impassable
-            color_costs["road_orange"] = 1.1
-            color_costs["gray"] = 100 # Impassable
+            keys = ["purple1", "purple2", "pink1", "pink2", "red"]
+            for key in keys:
+                color_costs[key] = 100
+
+        if self.map_type.get() == 'Forest':
+            main_colors.pop("gray", None)
+            main_colors.pop("road_orange", None)
+            main_colors.pop("passable_gray", None)
+
+            main_color_values.pop("gray", None)
+            main_color_values.pop("road_orange", None)
+            main_color_values.pop("passable_gray", None)
+
+            color_costs.pop("gray", None)
+            color_costs.pop("road_orange", None)
+            color_costs.pop("passable_gray", None)
+            color_costs["black"] = 1.3
+
+            keys = ["purple1", "purple2", "pink1", "pink2", "red"]
+            for key in keys:
+                color_costs[key] = 20
+
+        if self.contours.get() == '2.5m' or self.contours.get() == '5m':
 
             keys = ["brown1", "brown2", "brown3"]
             for key in keys:
-                color_costs[key] = 10
+                color_costs[key] = 10 if self.contours.get() == '2.5m' else 20
             
             keys = ["purple1", "purple2", "pink1", "pink2", "red"]
             for key in keys:
-                color_costs[key] = 50
-
+                color_costs[key] = 20
 
 
         cropped_image, start_point, end_point = crop_map_around_points(self.map_image, raw_start_point, raw_end_point, area)
@@ -430,7 +457,17 @@ class RouteAI:
 
         # Convert the cropped image to a PhotoImage and display it on the canvas
         self.cropped_photo = ImageTk.PhotoImage(cropped_image)
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.cropped_photo)
+        self.image_item = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.cropped_photo)
+
+        # Add a border around the cropped photo
+        border_width = 5
+        border_color = "#FF8C00"  # more darker orange
+        x1, y1, x2, y2 = self.canvas.bbox(self.image_item)
+        x1 -= border_width
+        y1 -= border_width
+        x2 += border_width
+        y2 += border_width
+        self.canvas.create_rectangle(x1, y1, x2, y2, outline=border_color, width=border_width)
 
         # Draw the optimal route on the canvas
         for i in range(len(path) - 1):
