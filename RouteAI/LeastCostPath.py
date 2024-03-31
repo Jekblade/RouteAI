@@ -315,6 +315,7 @@ class RouteAI:
         self.area = []
         self.start_point_selected = False
         self.finish_point_selected = False
+        self.drawing_polygon = False
         self.canvas.bind("<Button-1>", self.add_point)
 
 
@@ -326,6 +327,7 @@ class RouteAI:
         self.area = []
         self.start_point_selected = False
         self.finish_point_selected = False
+        self.drawing_polygon = False
 
         self.canvas.bind("<Button-1>", self.add_point)
 
@@ -366,6 +368,7 @@ class RouteAI:
             self.canvas.coords(self.text_item, event.x + 120, event.y + 20)
 
     def draw_polygon(self, event):
+        self.drawing_polygon = True
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         self.area.append((x, y))
 
@@ -376,8 +379,9 @@ class RouteAI:
 
 
     def finish_polygon(self, event):
-
-
+        if not self.drawing_polygon:
+            return
+        
         self.canvas.delete(self.polygon_item)
         self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=3)
         self.canvas.unbind("<B1-Motion>")
