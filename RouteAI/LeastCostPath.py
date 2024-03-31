@@ -376,8 +376,7 @@ class RouteAI:
 
 
     def finish_polygon(self, event):
-        if len(self.area) % 2 == 0:
-            self.area.append(self.area[0])
+
 
         self.canvas.delete(self.polygon_item)
         self.polygon_item = self.canvas.create_polygon(self.area, outline="black", fill='', width=3)
@@ -398,15 +397,18 @@ class RouteAI:
             main_colors[18] = "gray"
             main_colors[19] = "road_orange"
             main_colors[20] = "passable_gray"
+            main_colors[21] = "pale_road"
             main_color_values["gray"] = (138, 138, 138)
             main_color_values["road_orange"] = (225, 195, 165)
             main_color_values["passable_gray"] = (210, 210, 210)
+            main_color_values["pale_road"] = (250, 248, 224)
 
             color_costs.update({
             "black": 100,  # Impassable
             "road_orange": 1.1,
             "gray": 100,  # Impassable
-            "passable_gray": 1.1
+            "passable_gray": 1.1,
+            "pale_road": 1.1
             })
 
             keys = ["purple1", "purple2", "pink1", "pink2", "red"]
@@ -417,14 +419,17 @@ class RouteAI:
             main_colors.pop("gray", None)
             main_colors.pop("road_orange", None)
             main_colors.pop("passable_gray", None)
+            main_colors.pop("pale_road", None)
 
             main_color_values.pop("gray", None)
             main_color_values.pop("road_orange", None)
             main_color_values.pop("passable_gray", None)
+            main_color_values.pop("pale_road", None)
 
             color_costs.pop("gray", None)
             color_costs.pop("road_orange", None)
             color_costs.pop("passable_gray", None)
+            color_costs.pop("pale_road", None)
             color_costs["black"] = 1.3
 
             keys = ["purple1", "purple2", "pink1", "pink2", "red"]
