@@ -10,18 +10,19 @@ This project was done to learn about path-finding algorithms from Graph Theory. 
 The Orienteering Application offers three main features:
 
 1. RouteAI
-Description: Utilize advanced Image Processing algorithms and path-finding principles to see the optimal routes for orienteering controls. This feature enables mathematically optimal route-choice output for difficult controls.
+Description: Utilize advanced Image Processing algorithms and path-finding principles to see the optimal routes for orienteering controls. This feature enables athletes theoretically calculate the best route-choice for difficult controls.
 Usage:
 * Import a .PNG file to be analysed, choose "Forest or Sprint"
 * Select the start and end control (press "Enter")
 * Select an analysis boundary ("Drag and select")
+* finally press "Enter" to begin analysis
 
 3. MapConvert
-Description: A tool for converting PNG orienteering map into a scattered grid of generalized pixels. This is used to see how the computer processes the image into a pixel array that it understands. Upcoming release: blog about of what algorythmic approaches were used in image processing. This tool is used for tweaking the image processing part of the RouteAI code.
+Description: A tool for converting PNG orienteering map into a scattered grid of generalized pixels. This is used to see how the computer processes the image into a pixel array that it understands. Used for tweaking the image processing part of the RouteAI code.
 
 4. Rogaining
-Description: Plan your rogaining routes. This app asks for the user input of all the controls, then using various path-finding algorithms to connect all the controls in a line.
-Usage: Cheat at rogaining (not advised for legal reasons).
+Description: Plan your rogaining routes with ease. This app asks for the user input of all the controls, then using various path-finding algorithms to connect all the controls in a line.
+Usage: Cheat at rogaining (not advised haha).
 Improvements: Use Traveling Salesman Problem solutions, Minimun spanning tree etc., calculate the actual route.
 
 
@@ -51,7 +52,7 @@ For support, please open an issue on the GitHub repository page. We welcome feed
 
 # Contributing
 
-Contributions to the RouteAI are welcome. When sharing results of the app, please attribute the name of the app "RouteAI".
+Contributions to the Orienteering Application are welcome. When sharing results of the app, please attribute the author "Jekabs Janovs".
 
 
 # License

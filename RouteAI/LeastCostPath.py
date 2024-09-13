@@ -55,7 +55,7 @@ main_color_values = {
 # Costs associated with terrain runnability
 color_costs = {
     "white": 1.6, 
-    "yellow": 1.2,
+    "yellow": 1.3,
     "orange": 1.4,
     "light_green": 3,
     "green": 4.5,
@@ -63,7 +63,7 @@ color_costs = {
     "light_blue": 5,
     "blue": 5,
     "olive": 100,
-    "black": 1.3,
+    "black": 1,
     "brown1": 20,
     "brown2": 20,
     "brown3": 20,
@@ -107,6 +107,46 @@ def crop_map_around_points(map_image, raw_start_point, raw_end_point, area):
     return cropped_image, start_point, end_point
 
 
+# WHITE BALANCE CALIBRATION
+def load_image(image_path):
+    image = Image.open(image_path)
+    image_np = np.array(image)
+    return image_np
+
+def apply_white_balance(image_np, white_pixel):
+
+    if len(white_pixel) == 4:
+        white_pixel = white_pixel[:3]  # Take only the RGB values (not alfa)
+    
+    ideal_white = np.array([255, 255, 255])
+    error = ideal_white / white_pixel  # white balance correction factor
+    white_balanced_image = np.clip(image_np[:, :, :3] * error, 0, 255).astype(np.uint8)  # Apply to RGB values only
+    return white_balanced_image
+
+
+def get_white_pixel(image_np):
+    root = tk.Tk()
+    root.title("Select a White Pixel for White Balance")
+
+    img = Image.fromarray(image_np)
+    img_tk = ImageTk.PhotoImage(img)
+
+    label = tk.Label(root, image=img_tk)
+    label.pack()
+
+    white_pixel = []
+
+    def click_event(event):
+        x, y = event.x, event.y
+        white_pixel.extend(image_np[y, x])
+        root.quit()
+
+    label.bind('<Button-1>', click_event)
+    root.mainloop()
+
+    return np.array(white_pixel)
+
+
 # IMAGE PROCESSING
 def process_image(cropped_image, main_colors, main_color_values, color_tree):
     
@@ -125,7 +165,7 @@ def process_image(cropped_image, main_colors, main_color_values, color_tree):
     
         for x in range(width):
             pixel = map_image_np[y, x]
-            closest_color = find_closest_color(pixel, main_color_values, color_tree)
+            closest_color = find_closest_color(pixel, main_color_values)
             terrain_grid[x, y] = list(main_colors.keys())[list(main_colors.values()).index(closest_color)]
     
     print(f"    Processing image ({width}x{height} pixels): {round((time.time() - process_time), 3)}s", end='\r')
@@ -176,11 +216,12 @@ def process_image(cropped_image, main_colors, main_color_values, color_tree):
     return terrain_grid
 
 
+# Find the closest color using KDTree
+def find_closest_color(pixel, main_color_values):
 
-def find_closest_color(pixel, main_color_values, color_tree):
-    # Query the k-d tree to find the closest color
+    color_tree = KDTree(list(main_color_values.values()))
+
     _, index = color_tree.query(pixel[:3])
-
     closest_color = list(main_color_values.keys())[index]
     return closest_color
 
@@ -510,6 +551,7 @@ def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
+        
 
         root = tk.Tk()
         app = RouteAI(root, map_image)

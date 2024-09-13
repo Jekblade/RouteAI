@@ -73,7 +73,7 @@ def find_closest_color(pixel, main_color_values):
 
 # Apply white balance correction
 def apply_white_balance(image_np, white_pixel):
-    # Strip alpha channel if present
+  
     if len(white_pixel) == 4:
         white_pixel = white_pixel[:3]  # Take only the RGB values (not alfa)
     

@@ -4,7 +4,6 @@ from PIL import Image, ImageTk
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
-import networkx as nx
 
 class PointSelectionApp:
     def __init__(self, master, map_image):
