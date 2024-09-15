@@ -62,7 +62,7 @@ color_costs = {
     "dark_green": 6,
     "light_blue": 5,
     "blue": 5,
-    "olive": 100,
+    "olive": 5,
     "black": 1,
     "brown1": 20,
     "brown2": 20,
@@ -107,6 +107,8 @@ def crop_map_around_points(map_image, raw_start_point, raw_end_point, area):
     return cropped_image, start_point, end_point
 
 
+
+
 # WHITE BALANCE CALIBRATION
 def load_image(image_path):
     image = Image.open(image_path)
@@ -114,14 +116,20 @@ def load_image(image_path):
     return image_np
 
 def apply_white_balance(image_np, white_pixel):
-
     if len(white_pixel) == 4:
-        white_pixel = white_pixel[:3]  # Take only the RGB values (not alfa)
-    
+        white_pixel = white_pixel[:3]  # ingore alfa
+
     ideal_white = np.array([255, 255, 255])
-    error = ideal_white / white_pixel  # white balance correction factor
+
+    # If the white pixel is close to white, return the original image
+    if np.allclose(white_pixel, ideal_white, atol=10): 
+        return image_np
+
+    # Calculate white balance correction factor
+    error = ideal_white / white_pixel
     white_balanced_image = np.clip(image_np[:, :, :3] * error, 0, 255).astype(np.uint8)  # Apply to RGB values only
     return white_balanced_image
+
 
 
 def get_white_pixel(image_np):
@@ -293,23 +301,37 @@ def calculate_lowest_cost_path(terrain_costs, start_point, end_point):
     return path[::-1], cost
 
 
+import tkinter as tk
+from PIL import Image, ImageTk
+
 class RouteAI:
     def __init__(self, master, map_image):
 
         self.master = master
         self.master.title("Selection of start point and end point")
 
+        screen_width = self.master.winfo_screenwidth()
+        screen_height = self.master.winfo_screenheight()
+
+        max_width = int(screen_width * 0.6)  # 60% of the screen width
+        max_height = int(screen_height * 0.9)  # Full screen height
+
+        # Resize the image
+        img_width, img_height = map_image.size
+        if img_height > max_height or img_width > max_width:
+            # keeping aspect ratio
+            ratio = min(max_width / img_width, max_height / img_height)
+            new_width = int(img_width * ratio)
+            new_height = int(img_height * ratio)
+            map_image = map_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
         self.canvas = tk.Canvas(master)
         self.canvas.pack(side="left", fill="y")
-
-        # Scrollbars
-        self.v_scrollbar = tk.Scrollbar(master, orient="vertical", command=self.canvas.yview)
-        self.v_scrollbar.pack(side="right", fill="y")
-        self.canvas.configure(yscrollcommand=self.v_scrollbar.set)
 
         self.map_image = map_image
         self.map_photo = ImageTk.PhotoImage(map_image)
         self.image_item = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.map_photo)
+
         canvas_width = self.map_photo.width()
         canvas_height = self.map_photo.height()
         self.canvas.config(width=canvas_width, height=canvas_height)
@@ -318,6 +340,7 @@ class RouteAI:
         self.map_type.set("Forest")  # Default selection
         self.contours = tk.StringVar()
         self.contours.set("2.5m")  # Default selection
+
 
         button_frame = tk.Frame(master)
         button_frame.pack(side=tk.RIGHT, padx=10, pady=10)
@@ -551,6 +574,7 @@ def main():
     file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
     if file_path:
         map_image = Image.open(file_path)
+
         
 
         root = tk.Tk()
