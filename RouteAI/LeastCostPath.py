@@ -6,6 +6,7 @@ from tkinter import filedialog
 from tkinter.simpledialog import Dialog
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
+from scipy.ndimage import binary_dilation
 import time
 import math
 
@@ -54,24 +55,24 @@ main_color_values = {
 
 # Costs associated with terrain runnability
 color_costs = {
-    "white": 1.6, 
-    "yellow": 1.3,
-    "orange": 1.4,
-    "light_green": 3,
-    "green": 4.5,
-    "dark_green": 6,
-    "light_blue": 5,
-    "blue": 5,
-    "olive": 5,
+    "white": 1.5, 
+    "yellow": 1.2,
+    "orange": 1.3,
+    "light_green": 2,
+    "green": 3,
+    "dark_green": 4,
+    "light_blue": 4,
+    "blue": 4,
+    "olive": 10,
     "black": 1,
-    "brown1": 20,
-    "brown2": 20,
-    "brown3": 20,
-    "purple1": 20,
-    "purple2": 20,
-    "pink1": 20,
-    "pink2": 20,
-    "red": 20
+    "brown1": 10,
+    "brown2": 10,
+    "brown3": 10,
+    "purple1": 10,
+    "purple2": 10,
+    "pink1": 10,
+    "pink2": 10,
+    "red": 10
 }
 
 
@@ -207,20 +208,30 @@ def process_image(cropped_image, main_colors, main_color_values, color_tree):
     light_blue_id = 6
     blue_id = 7
     black_id = 9
-    yellow_id = 1
-    orange_id = 2
 
     for y in range(1, height - 1):
         for x in range(1, width - 1):
-            if terrain_grid[x, y] in [light_blue_id, blue_id, yellow_id, orange_id]:
+            if terrain_grid[x, y] in [light_blue_id, blue_id]:
                 for dx in range(-2, 3):
                     for dy in range(-2, 3):
                         nx, ny = x + dx, y + dy
                         if 0 <= nx < width and 0 <= ny < height and terrain_grid[nx, ny] != blue_id:
-                            if terrain_grid[nx, ny] == black_id or terrain_grid[nx, ny] == yellow_id or terrain_grid[nx, ny] == orange_id:
+                            if terrain_grid[nx, ny] == black_id:
                                 terrain_grid[nx, ny] = blue_id
 
     print(f"\n    Removing lake and river borders: {round((time.time() - lakes_time), 3)}s")
+
+
+    # Step 4: Give more weight to trails and roads
+    trails_grid = np.copy(terrain_grid)
+    black_id = 9
+
+    mask = (trails_grid == black_id)
+    dilated_trails = binary_dilation(mask, structure=np.ones((4, 4))).astype(np.uint8)
+
+    trails_mask = (dilated_trails == 1) & (terrain_grid != black_id)
+    terrain_grid[trails_mask] = black_id 
+
     return terrain_grid
 
 
@@ -313,8 +324,8 @@ class RouteAI:
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
 
-        max_width = int(screen_width * 0.6)  # 60% of the screen width
-        max_height = int(screen_height * 0.9)  # Full screen height
+        max_width = int(screen_width * 0.9)  # 90% of the screen width
+        max_height = int(screen_height * 0.9)  # 90% of height
 
         # Resize the image
         img_width, img_height = map_image.size
@@ -361,6 +372,10 @@ class RouteAI:
         self.another_route_button = tk.Button(button_frame, text="Create a new route", command=self.another_route)
         self.another_route_button.grid(row=7, column=0, columnspan=2)
 
+        self.another_map_button = tk.Button(button_frame, text="Choose another map", command=lambda:self.another_map(self.master))
+        self.another_map_button.grid(row=8, column=0, columnspan=2)
+
+
         # Add StringVars for the progress, optimal route cost, and approximated time
         self.progress = tk.StringVar()
         self.progress.set("Progress: 0%")
@@ -370,9 +385,9 @@ class RouteAI:
         self.approximated_time.set("Approximated time: N/A")
 
         # Add labels for the progress, optimal route cost, and approximated time
-        tk.Label(button_frame, textvariable=self.progress).grid(row=8, column=0, columnspan=2)
-        tk.Label(button_frame, textvariable=self.optimal_route_cost).grid(row=9, column=0, columnspan=2)
-        tk.Label(button_frame, textvariable=self.approximated_time).grid(row=10, column=0, columnspan=2)
+        tk.Label(button_frame, textvariable=self.progress).grid(row=9, column=0, columnspan=2)
+        tk.Label(button_frame, textvariable=self.optimal_route_cost).grid(row=10, column=0, columnspan=2)
+        tk.Label(button_frame, textvariable=self.approximated_time).grid(row=11, column=0, columnspan=2)
 
 
         self.points = []
@@ -394,6 +409,19 @@ class RouteAI:
         self.drawing_polygon = False
 
         self.canvas.bind("<Button-1>", self.add_point)
+
+
+    def another_map(self, master):
+
+        self.master.destroy() # Destroy current analysis
+
+        file_path = filedialog.askopenfilename(title="Select Map Image", filetypes=[("PNG files", "*.png")])
+        if file_path:
+            map_image = Image.open(file_path)
+
+            root = tk.Tk()
+            app = RouteAI(root, map_image)
+            root.mainloop()
 
 
     def add_point(self, event):
@@ -466,17 +494,24 @@ class RouteAI:
             main_colors[19] = "road_orange"
             main_colors[20] = "passable_gray"
             main_colors[21] = "pale_road"
+            main_colors[6] = 'light_blue'
+            main_colors[7] = 'blue'
+
             main_color_values["gray"] = (138, 138, 138)
             main_color_values["road_orange"] = (225, 195, 165)
             main_color_values["passable_gray"] = (210, 210, 210)
             main_color_values["pale_road"] = (250, 248, 224)
+            main_color_values["light_blue"] = (120, 220, 230)
+            main_color_values["blue"] = (0, 160, 215)
 
             color_costs.update({
             "black": 100,  # Impassable
             "road_orange": 1.1,
             "gray": 100,  # Impassable
             "passable_gray": 1.1,
-            "pale_road": 1.1
+            "pale_road": 1.1,
+            "light_blue": 100,
+            "blue": 100 
             })
 
             keys = ["purple1", "purple2", "pink1", "pink2", "red"]
@@ -498,11 +533,13 @@ class RouteAI:
             color_costs.pop("road_orange", None)
             color_costs.pop("passable_gray", None)
             color_costs.pop("pale_road", None)
-            color_costs["black"] = 1.3
+            color_costs["black"] = 1
+            color_costs["light_blue"] = 4
+            color_costs["blue"] = 4
 
             keys = ["purple1", "purple2", "pink1", "pink2", "red"]
             for key in keys:
-                color_costs[key] = 20
+                color_costs[key] = 10
 
         if self.contours.get() == '2.5m' or self.contours.get() == '5m':
 
@@ -512,7 +549,7 @@ class RouteAI:
             
             keys = ["purple1", "purple2", "pink1", "pink2", "red"]
             for key in keys:
-                color_costs[key] = 20
+                color_costs[key] = 10
 
 
         cropped_image, start_point, end_point = crop_map_around_points(self.map_image, raw_start_point, raw_end_point, area)
